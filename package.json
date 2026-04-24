@@ -1,0 +1,49 @@
+{
+  "name": "openrat",
+  "version": "2.0.0",
+  "description": "OpenRat — Local OpenAI-compatible gateway with multi-provider support, key rotation, spend limits, scheduling, and visual dashboard.",
+  "type": "module",
+  "bin": {
+    "openrat": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "npm run build && node --test dist/test/**/*.test.js",
+    "start": "node dist/src/index.js",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "openrat",
+    "gateway",
+    "openai-compatible",
+    "llm",
+    "ai",
+    "proxy",
+    "gemini",
+    "grok",
+    "openrouter",
+    "deepseek",
+    "key-rotation",
+    "multi-provider",
+    "claude-code",
+    "langchain"
+  ],
+  "author": "robervala138-coder <https://github.com/robervala138-coder>",
+  "license": "MIT",
+  "homepage": "https://github.com/robervala138-coder/openrat#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robervala138-coder/openrat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/robervala138-coder/openrat/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.20",
+    "typescript": "^5.8.3"
+  }
+}

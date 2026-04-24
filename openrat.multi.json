@@ -1,0 +1,175 @@
+{
+  "basePort": 4419,
+  "instances": [
+    {
+      "name": "rat-1",
+      "port": 4419,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_1_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-2",
+      "port": 4421,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_2_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-3",
+      "port": 4423,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_3_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-4",
+      "port": 4425,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_4_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-5",
+      "port": 4427,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_5_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-6",
+      "port": 4429,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_6_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-7",
+      "port": 4431,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_7_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-8",
+      "port": 4433,
+      "masterKey": "openrai-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_8_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-9",
+      "port": 4435,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_9_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-10",
+      "port": 4437,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-CHAVE_10_AQUI"],
+          "aliases": ["openrouter", "tencent/hy3-preview:free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    }
+  ]
+}

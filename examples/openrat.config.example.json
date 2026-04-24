@@ -1,0 +1,50 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 4419,
+    "masterKey": "openrat-local",
+    "rotation": "round-robin"
+  },
+  "routes": {
+    "default": "gemini-flash"
+  },
+  "providers": {
+    "gemini-flash": {
+      "type": "google-ai-studio",
+      "model": "gemini-2.5-flash",
+      "aliases": ["gemini-fast", "flash"],
+      "apiKeys": ["AIza-YOUR-KEY-HERE"],
+      "costPer1MInputTokens": 0.075,
+      "costPer1MOutputTokens": 0.30,
+      "spendLimit": {
+        "dailyUsd": 1.0,
+        "monthlyUsd": 10.0
+      }
+    },
+    "grok-mini": {
+      "type": "xai",
+      "model": "grok-3-mini",
+      "aliases": ["grok"],
+      "apiKeys": ["xai-YOUR-KEY-HERE"]
+    },
+    "deepseek": {
+      "type": "openai-compatible",
+      "model": "deepseek-chat",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "apiKeys": ["sk-YOUR-KEY-HERE", "sk-YOUR-SECOND-KEY"],
+      "costPer1MInputTokens": 0.27,
+      "costPer1MOutputTokens": 1.10
+    },
+    "openrouter-free": {
+      "type": "openai-compatible",
+      "model": "tencent/hy3-preview:free",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeys": ["sk-or-v1-YOUR-KEY-HERE"],
+      "aliases": ["free"],
+      "schedule": {
+        "fromHour": 8,
+        "toHour": 22
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "basePort": 4419,
+  "instances": [
+    {
+      "name": "rat-1",
+      "port": 4419,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-YOUR-KEY-1"],
+          "aliases": ["openrouter", "free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-2",
+      "port": 4421,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-YOUR-KEY-2"],
+          "aliases": ["openrouter", "free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    },
+    {
+      "name": "rat-3",
+      "port": 4423,
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-YOUR-KEY-3"],
+          "aliases": ["openrouter", "free"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    }
+  ]
+}
