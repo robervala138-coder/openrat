@@ -715,73 +715,6 @@
     letter-spacing: 0.08em;
     font-family: var(--mono);
   }
-
-/* KEY VAULT */
-.vault-section { margin-top: 8px; }
-.vault-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; font-size: 10px; font-weight: 700;
-  letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase;
-}
-.vault-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px; margin: 1px 8px; border-radius: var(--r2);
-  transition: background 0.12s; cursor: pointer; border: 1px solid transparent;
-}
-.vault-item:hover { background: var(--surface); border-color: var(--border2); }
-.vault-key-preview {
-  font-family: var(--mono); font-size: 11px; color: var(--text2);
-  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vault-label {
-  font-size: 10px; color: var(--accent); font-weight: 600;
-  background: var(--accent-glow); padding: 2px 6px; border-radius: 3px;
-  max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vault-provider {
-  font-size: 10px; color: var(--text3); font-family: var(--mono);
-}
-.vault-empty {
-  padding: 12px; text-align: center; font-size: 12px; color: var(--text3);
-}
-
-/* EXECUTION MODE */
-.exec-btn {
-  padding: 7px 14px; border-radius: var(--r2);
-  border: 1px solid var(--green-dim);
-  background: var(--green-dim); color: var(--green);
-  font-family: var(--sans); font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all 0.15s;
-  display: flex; align-items: center; gap: 6px;
-}
-.exec-btn:hover { background: rgba(62,207,142,0.2); border-color: var(--green); }
-.exec-btn.running-state {
-  border-color: var(--amber-dim); background: var(--amber-dim); color: var(--amber);
-}
-
-/* EDIT MODAL PERSISTENCE - prevent overlay click closing */
-.modal-overlay.persistent { cursor: default; }
-
-/* KEY PICKER DROPDOWN */
-.key-picker {
-  position: absolute; background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: var(--r); padding: 8px; max-height: 240px; overflow-y: auto;
-  z-index: 250; min-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-}
-.key-picker-item {
-  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-  border-radius: var(--r2); cursor: pointer; transition: background 0.12s;
-}
-.key-picker-item:hover { background: var(--surface); }
-.key-picker-key {
-  font-family: var(--mono); font-size: 11px; color: var(--text2);
-  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.key-picker-label {
-  font-size: 10px; color: var(--accent); font-weight: 600;
-  background: var(--accent-glow); padding: 2px 6px; border-radius: 3px;
-}
-.key-picker-empty { padding: 12px; font-size: 12px; color: var(--text3); text-align: center; }
 </style>
 </head>
 <body>
@@ -798,8 +731,7 @@
     <button class="tab-btn" onclick="switchTab('config')">Config JSON</button>
   </div>
   <div class="topbar-actions">
-    <button class="exec-btn" id="exec-btn" onclick="execMode()">▶ Executar</button>
-      <button class="btn" onclick="openImportModal()">⬆ Importar</button>
+    <button class="btn" onclick="openImportModal()">⬆ Importar</button>
     <button class="btn" onclick="exportConfig()">⬇ Exportar</button>
     <button class="btn primary" onclick="openAddModal()">+ Nova Instância</button>
   </div>
@@ -862,19 +794,6 @@
         </div>
       </div>
       <div class="rats-grid" id="rats-grid"></div>
-
-      <!-- BAÚ DE CHAVES (COFRE) na Visão Geral -->
-      <div style="margin-top:24px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:18px;">🔐</span>
-            <span style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);">Baú de Chaves</span>
-            <span style="font-family:var(--mono);font-size:11px;color:var(--text3);" id="ov-vault-count">0 chaves</span>
-          </div>
-          <button class="btn" style="padding:5px 10px;font-size:11px;" onclick="openVaultModal()">+ Adicionar</button>
-        </div>
-        <div id="ov-vault-list" class="vault-section"></div>
-      </div>
     </div>
 
     <!-- DETAIL -->
@@ -950,7 +869,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Master Key</label>
-        <input class="form-input" id="f-masterkey" placeholder="rat">
+        <input class="form-input" id="f-masterkey" placeholder="openrat-local">
       </div>
       <div class="form-group">
         <label class="form-label">Rotação</label>
@@ -1019,68 +938,6 @@
   </div>
 </div>
 
-<!-- VAULT MODAL -->
-<div class="modal-overlay" id="vault-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Cofre de Chaves — Adicionar</div>
-      <button class="modal-close" onclick="closeModal('vault-modal')">&#10005;</button>
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-      <label class="form-label">Chave de API</label>
-      <input class="form-input" id="v-key" placeholder="sk-or-v1-... / AIza-... / xai-...">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Nome / Ambiente</label>
-        <input class="form-input" id="v-label" placeholder="Ex: OpenRouter pessoal, DeepSeek prod">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Provider</label>
-        <select class="form-select" id="v-provider">
-          <option value="openrouter">OpenRouter</option>
-          <option value="google-ai-studio">Google AI Studio</option>
-          <option value="xai">xAI (Grok)</option>
-          <option value="deepseek">DeepSeek</option>
-          <option value="openai">OpenAI</option>
-          <option value="outro">Outro</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('vault-modal')">Cancelar</button>
-      <button class="btn primary" onclick="addVaultKey()">Salvar no Cofre</button>
-    </div>
-  </div>
-</div>
-
-<!-- KEY PICKER MODAL (pick a key from vault) -->
-<div class="modal-overlay" id="keypicker-modal">
-  <div class="modal" style="max-width:480px;">
-    <div class="modal-header">
-      <div class="modal-title">Escolher Chave do Cofre</div>
-      <button class="modal-close" onclick="closeModal('keypicker-modal')">&#10005;</button>
-    </div>
-    <div id="keypicker-list" style="max-height:300px;overflow-y:auto;"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('keypicker-modal')">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- EXEC STATUS MODAL -->
-<div class="modal-overlay" id="exec-modal">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-header">
-      <div class="modal-title">Modo Execucao</div>
-      <button class="modal-close" onclick="closeModal('exec-modal')">&#10005;</button>
-    </div>
-    <div id="exec-content" style="text-align:center;padding:20px 0;">
-      <p style="color:var(--text2);font-size:13px;">Verificando configuracao...</p>
-    </div>
-  </div>
-</div>
-
 <!-- NOTIFICATION -->
 <div class="notif" id="notif">
   <span id="notif-icon">✓</span>
@@ -1094,7 +951,6 @@ let state = {
   instances: []
 };
 
-let keyVault = []; // [{id, key, label, provider, addedAt}]
 let selectedIdx = -1;
 let editingIdx = -1;
 let graphNodes = [];
@@ -1113,12 +969,7 @@ function init() {
   } else {
     loadDefaultState();
   }
-  const savedVault = localStorage.getItem('openrat-keyvault');
-  if (savedVault) {
-    try { keyVault = JSON.parse(savedVault); } catch(e) { keyVault = []; }
-  }
   render();
-  checkExecStatus(); // Check if gateway is already running
 }
 
 function loadDefaultState() {
@@ -1127,7 +978,7 @@ function loadDefaultState() {
     instances: Array.from({length: 10}, (_, i) => ({
       name: `rat-${i+1}`,
       port: 4419 + i*2,
-      masterKey: 'rat',
+      masterKey: 'openrat-local',
       rotation: 'round-robin',
       routes: { default: 'openrouter' },
       providers: {
@@ -1149,16 +1000,11 @@ function saveState() {
   localStorage.setItem('openrat-state', JSON.stringify(state));
 }
 
-function saveVault() {
-  localStorage.setItem('openrat-keyvault', JSON.stringify(keyVault));
-}
-
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function render() {
   renderSidebar();
   renderOverview();
   renderConfig();
-  renderVault();
   if (selectedIdx >= 0) renderDetail(selectedIdx);
   drawGraph();
 }
@@ -1194,7 +1040,7 @@ function renderOverview() {
     const keys = Object.values(inst.providers).flatMap(p => p.apiKeys || []);
     const miniKeys = keys.map(k => `<div class="mini-key active" title="${esc(k)}"></div>`).join('');
     return `
-      <div class="rat-card" onclick="handleRatCardClick(${i})">
+      <div class="rat-card" onclick="selectRat(${i});switchTab('detail')">
         <div class="rat-card-top">
           <div class="rat-card-name">${esc(inst.name)}</div>
           <span class="badge running">ativo</span>
@@ -1568,8 +1414,8 @@ canvas.addEventListener('mouseup', e => {
     const dist = Math.sqrt((dragNode.x - mx - dragOffsetX)**2 + (dragNode.y - my - dragOffsetY)**2);
     if (dist < 5 && dragNode.type === 'rat') {
       selectRat(dragNode.idx);
-        // Stay on graph tab
-      }
+      switchTab('detail');
+    }
   }
   isDragging = false;
   dragNode = null;
@@ -1598,6 +1444,17 @@ function deleteInstance(idx) {
   notify('Instância removida', '🗑');
 }
 
+function editKey(instIdx, pid, ki) {
+  const key = state.instances[instIdx].providers[pid].apiKeys[ki];
+  const newKey = prompt('Editar chave de API:', key);
+  if (newKey === null) return;
+  if (!newKey.trim()) { alert('Chave não pode ser vazia'); return; }
+  state.instances[instIdx].providers[pid].apiKeys[ki] = newKey.trim();
+  saveState();
+  renderDetail(instIdx);
+  renderConfig();
+  notify('Chave atualizada', '✓');
+}
 
 function removeKey(instIdx, pid, ki) {
   if (!confirm('Remover esta chave?')) return;
@@ -1613,7 +1470,16 @@ function copyKey(key) {
 }
 
 // ─── ADD KEY INLINE ───────────────────────────────────────────────────────────
-
+function openAddKeyModal(instIdx, pid) {
+  const key = prompt('Nova chave de API (sk-or-v1-...):');
+  if (!key || !key.trim()) return;
+  state.instances[instIdx].providers[pid].apiKeys.push(key.trim());
+  saveState();
+  renderDetail(instIdx);
+  renderConfig();
+  drawGraph();
+  notify('Chave adicionada!', '✓');
+}
 
 // ─── ADD/EDIT MODAL ───────────────────────────────────────────────────────────
 function openAddModal() {
@@ -1621,7 +1487,7 @@ function openAddModal() {
   document.getElementById('modal-title').textContent = 'Nova Instância';
   document.getElementById('f-name').value = `rat-${state.instances.length+1}`;
   document.getElementById('f-port').value = state.basePort + state.instances.length*2;
-  document.getElementById('f-masterkey').value = 'rat';
+  document.getElementById('f-masterkey').value = 'openrat-local';
   document.getElementById('f-rotation').value = 'round-robin';
   document.getElementById('f-provider').value = 'openrouter';
   document.getElementById('f-type').value = 'openai-compatible';
@@ -1640,7 +1506,7 @@ function openEditModal(idx) {
   document.getElementById('modal-title').textContent = `Editar: ${inst.name}`;
   document.getElementById('f-name').value = inst.name;
   document.getElementById('f-port').value = inst.port || '';
-  document.getElementById('f-masterkey').value = inst.masterKey || 'rat';
+  document.getElementById('f-masterkey').value = inst.masterKey || 'openrat-local';
   document.getElementById('f-rotation').value = inst.rotation || 'round-robin';
   document.getElementById('f-provider').value = provId;
   document.getElementById('f-type').value = prov.type;
@@ -1648,22 +1514,21 @@ function openEditModal(idx) {
   document.getElementById('f-model').value = prov.model;
   const kf = document.getElementById('key-fields');
   kf.innerHTML = '';
-  (prov.apiKeys || []).forEach((k) => addKeyField(k, ''));
-  // Values already set via addKeyField presetKey parameter
+  (prov.apiKeys || []).forEach(() => addKeyField());
+  kf.querySelectorAll('.form-input').forEach((inp, i) => {
+    inp.value = prov.apiKeys[i] || '';
+  });
   openModal('add-modal');
 }
 
 let keyFieldCount = 0;
-function addKeyField(presetKey, presetLabel) {
+function addKeyField() {
   keyFieldCount++;
   const div = document.createElement('div');
   div.className = 'key-input-row';
-  div.style.flexWrap = 'wrap';
   div.innerHTML = `
     <span class="key-number">#${keyFieldCount}</span>
-    <input class="form-input key-input" placeholder="sk-or-v1-..." value="${esc(presetKey||'')}">
-    <input class="form-input key-label-input" placeholder="Nome/ambiente (opcional)" value="${esc(presetLabel||'')}" style="width:140px;font-size:11px;">
-    <button class="icon-btn" title="Escolher do cofre" onclick="pickFromVault(this)" style="font-size:11px;">🔑</button>
+    <input class="form-input" placeholder="sk-or-v1-...">
     <button class="icon-btn danger" onclick="this.parentElement.remove()" title="Remover">×</button>
   `;
   document.getElementById('key-fields').appendChild(div);
@@ -1672,7 +1537,7 @@ function addKeyField(presetKey, presetLabel) {
 function saveInstance() {
   const name = document.getElementById('f-name').value.trim();
   const portVal = document.getElementById('f-port').value.trim();
-  const masterKey = document.getElementById('f-masterkey').value.trim() || 'rat';
+  const masterKey = document.getElementById('f-masterkey').value.trim() || 'openrat-local';
   const rotation = document.getElementById('f-rotation').value;
   const provId = document.getElementById('f-provider').value.trim() || 'openrouter';
   const type = document.getElementById('f-type').value;
@@ -1682,22 +1547,8 @@ function saveInstance() {
   if (!name) { alert('Nome é obrigatório'); return; }
   if (!model) { alert('Model é obrigatório'); return; }
 
-  const apiKeys = Array.from(document.getElementById('key-fields').querySelectorAll('.key-input'))
+  const apiKeys = Array.from(document.getElementById('key-fields').querySelectorAll('.form-input'))
     .map(i => i.value.trim()).filter(Boolean);
-  // Also auto-save keys with labels to vault
-  const keyRows = document.getElementById('key-fields').querySelectorAll('.key-input-row');
-  keyRows.forEach(row => {
-    const kInput = row.querySelector('.key-input');
-    const lInput = row.querySelector('.key-label-input');
-    if (kInput && lInput && kInput.value.trim() && lInput.value.trim()) {
-      const k = kInput.value.trim();
-      const l = lInput.value.trim();
-      if (!keyVault.some(v => v.key === k)) {
-        keyVault.push({ id: 'vault-' + Date.now() + Math.random().toString(36).slice(2,6), key: k, label: l, provider: provId, addedAt: Date.now() });
-        saveVault();
-      }
-    }
-  });
 
   if (apiKeys.length === 0) { alert('Adicione pelo menos uma chave'); return; }
 
@@ -1812,13 +1663,9 @@ function syntaxHighlight(json) {
     });
 }
 
-// Close modals on overlay click (except add-modal which must use X or Cancelar)
+// Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay && overlay.id !== 'add-modal') {
-      overlay.classList.remove('open');
-    }
-  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
 });
 
 // Resize graph on window resize
@@ -1826,360 +1673,6 @@ window.addEventListener('resize', () => {
   const activePanel = document.querySelector('.tab-panel.active');
   if (activePanel && activePanel.id === 'tab-graph') drawGraph();
 });
-
-// ─── KEY VAULT ──────────────────────────────────────────────────────────────
-
-function openVaultModal() {
-  document.getElementById('v-key').value = '';
-  document.getElementById('v-label').value = '';
-  document.getElementById('v-provider').value = 'openrouter';
-  openModal('vault-modal');
-}
-
-function addVaultKey() {
-  const key = document.getElementById('v-key').value.trim();
-  const label = document.getElementById('v-label').value.trim();
-  const provider = document.getElementById('v-provider').value;
-  if (!key) { alert('Chave nao pode ser vazia'); return; }
-  // Check duplicate
-  if (keyVault.some(v => v.key === key)) { alert('Esta chave ja esta no cofre'); return; }
-  keyVault.push({
-    id: 'vault-' + Date.now(),
-    key: key,
-    label: label || provider,
-    provider: provider,
-    addedAt: Date.now()
-  });
-  saveVault();
-  closeModal('vault-modal');
-  renderVault();
-  notify('Chave adicionada ao cofre!', '🔑');
-}
-
-function removeVaultKey(vaultId) {
-  if (!confirm('Remover esta chave do cofre?')) return;
-  keyVault = keyVault.filter(v => v.id !== vaultId);
-  saveVault();
-  renderVault();
-  notify('Chave removida do cofre', '🗑');
-}
-
-function renderVault() {
-  // Sync overview vault (Visão Geral)
-  const ovVaultList = document.getElementById('ov-vault-list');
-  const ovVaultCount = document.getElementById('ov-vault-count');
-  if (ovVaultList && ovVaultCount) {
-    ovVaultCount.textContent = keyVault.length + ' chave' + (keyVault.length !== 1 ? 's' : '');
-    if (keyVault.length === 0) {
-      ovVaultList.innerHTML = '<div class="vault-empty">Nenhuma chave no cofre. Clique em "+ Adicionar" para guardar suas chaves de API.</div>';
-    } else {
-      ovVaultList.innerHTML = keyVault.map(v => `
-        <div class="vault-item" onclick="useVaultKey('${esc(v.id)}')" title="Clique para copiar a chave">
-          <span class="vault-label">${esc(v.label)}</span>
-          <span class="vault-key-preview">${esc(maskKey(v.key))}</span>
-          <span class="vault-provider">${esc(v.provider)}</span>
-          <button class="icon-btn danger" style="width:18px;height:18px;font-size:9px;" onclick="event.stopPropagation();removeVaultKey('${esc(v.id)}')" title="Remover do cofre">×</button>
-        </div>
-      `).join('');
-    }
-  }
-  // Sidebar vault
-  const list = document.getElementById('vault-list');
-  if (!list) return;
-  if (keyVault.length === 0) {
-    list.innerHTML = '<div class="vault-empty">Nenhuma chave no cofre</div>';
-    return;
-  }
-  list.innerHTML = keyVault.map(v => `
-    <div class="vault-item" onclick="useVaultKey('${esc(v.id)}')" title="Clique para usar esta chave">
-      <span class="vault-label">${esc(v.label)}</span>
-      <span class="vault-key-preview">${esc(maskKey(v.key))}</span>
-      <span class="vault-provider">${esc(v.provider)}</span>
-      <button class="icon-btn danger" style="width:18px;height:18px;font-size:9px;" onclick="event.stopPropagation();removeVaultKey('${esc(v.id)}')" title="Remover do cofre">×</button>
-    </div>
-  `).join('');
-}
-
-function useVaultKey(vaultId) {
-  const entry = keyVault.find(v => v.id === vaultId);
-  if (!entry) return;
-  navigator.clipboard.writeText(entry.key).then(() => notify('Chave copiada! ' + entry.label, '📋'));
-}
-
-// ─── KEY PICKER (from vault into edit modal) ─────────────────────────────────
-
-let pickerCallback = null;
-
-function pickFromVault(btn) {
-  const row = btn.closest('.key-input-row');
-  const keyInput = row.querySelector('.key-input');
-  const labelInput = row.querySelector('.key-label-input');
-  
-  if (keyVault.length === 0) {
-    alert('O cofre de chaves esta vazio. Adicione chaves clicando em "+ Cofre" na barra lateral.');
-    return;
-  }
-
-  const list = document.getElementById('keypicker-list');
-  list.innerHTML = keyVault.map(v => `
-    <div class="key-picker-item" onclick="selectVaultKey('${esc(v.id)}')">
-      <span class="key-picker-label">${esc(v.label)}</span>
-      <span class="key-picker-key">${esc(maskKey(v.key))}</span>
-      <span class="vault-provider">${esc(v.provider)}</span>
-    </div>
-  `).join('');
-  
-  pickerCallback = (key, label) => {
-    keyInput.value = key;
-    if (labelInput) labelInput.value = label;
-  };
-  openModal('keypicker-modal');
-}
-
-function selectVaultKey(vaultId) {
-  const entry = keyVault.find(v => v.id === vaultId);
-  if (!entry || !pickerCallback) return;
-  pickerCallback(entry.key, entry.label);
-  pickerCallback = null;
-  closeModal('keypicker-modal');
-  notify('Chave do cofre selecionada: ' + entry.label, '🔑');
-}
-
-// ─── HANDLE RAT CARD CLICK (respect edit modal) ──────────────────────────────
-
-function handleRatCardClick(idx) {
-  // If edit modal is open, don't navigate away
-  const addModal = document.getElementById('add-modal');
-  if (addModal && addModal.classList.contains('open')) return;
-  selectRat(idx);
-  switchTab('detail');
-}
-
-// ─── OPEN ADD KEY MODAL (enhanced with vault) ────────────────────────────────
-
-function openAddKeyModal(instIdx, pid) {
-  // Show a prompt with option to type or pick from vault
-  if (keyVault.length > 0) {
-    const useVault = confirm('Deseja escolher uma chave do cofre?\n\nOK = Escolher do cofre\nCancelar = Digitar manualmente');
-    if (useVault) {
-      const list = document.getElementById('keypicker-list');
-      list.innerHTML = keyVault.map(v => `
-        <div class="key-picker-item" onclick="addVaultKeyToRat(${instIdx},'${esc(pid)}','${esc(v.id)}')">
-          <span class="key-picker-label">${esc(v.label)}</span>
-          <span class="key-picker-key">${esc(maskKey(v.key))}</span>
-          <span class="vault-provider">${esc(v.provider)}</span>
-        </div>
-      `).join('');
-      pickerCallback = null;
-      openModal('keypicker-modal');
-      return;
-    }
-  }
-  const key = prompt('Nova chave de API (sk-or-v1-...):');
-  if (!key || !key.trim()) return;
-  state.instances[instIdx].providers[pid].apiKeys.push(key.trim());
-  saveState();
-  renderDetail(instIdx);
-  renderConfig();
-  drawGraph();
-  notify('Chave adicionada!', '✓');
-}
-
-function addVaultKeyToRat(instIdx, pid, vaultId) {
-  const entry = keyVault.find(v => v.id === vaultId);
-  if (!entry) return;
-  state.instances[instIdx].providers[pid].apiKeys.push(entry.key);
-  saveState();
-  closeModal('keypicker-modal');
-  renderDetail(instIdx);
-  renderConfig();
-  drawGraph();
-  notify('Chave do cofre adicionada: ' + entry.label, '🔑');
-}
-
-// ─── EDIT KEY (enhanced with vault option) ───────────────────────────────────
-
-function editKey(instIdx, pid, ki) {
-  const key = state.instances[instIdx].providers[pid].apiKeys[ki];
-  if (keyVault.length > 0) {
-    const useVault = confirm('Deseja escolher uma chave do cofre para substituir?\n\nOK = Escolher do cofre\nCancelar = Digitar manualmente');
-    if (useVault) {
-      const list = document.getElementById('keypicker-list');
-      list.innerHTML = keyVault.map(v => `
-        <div class="key-picker-item" onclick="replaceKeyFromVault(${instIdx},'${esc(pid)}',${ki},'${esc(v.id)}')">
-          <span class="key-picker-label">${esc(v.label)}</span>
-          <span class="key-picker-key">${esc(maskKey(v.key))}</span>
-          <span class="vault-provider">${esc(v.provider)}</span>
-        </div>
-      `).join('');
-      pickerCallback = null;
-      openModal('keypicker-modal');
-      return;
-    }
-  }
-  const newKey = prompt('Editar chave de API:', key);
-  if (newKey === null) return;
-  if (!newKey.trim()) { alert('Chave nao pode ser vazia'); return; }
-  state.instances[instIdx].providers[pid].apiKeys[ki] = newKey.trim();
-  saveState();
-  renderDetail(instIdx);
-  renderConfig();
-  notify('Chave atualizada', '✓');
-}
-
-function replaceKeyFromVault(instIdx, pid, ki, vaultId) {
-  const entry = keyVault.find(v => v.id === vaultId);
-  if (!entry) return;
-  state.instances[instIdx].providers[pid].apiKeys[ki] = entry.key;
-  saveState();
-  closeModal('keypicker-modal');
-  renderDetail(instIdx);
-  renderConfig();
-  notify('Chave substituida do cofre: ' + entry.label, '🔑');
-}
-
-// ─── EXEC MODE ───────────────────────────────────────────────────────────────
-
-let execRunning = false;
-
-// Check gateway status on page load so the button reflects reality
-function checkExecStatus() {
-  fetch('/openrat/status')
-    .then(r => r.json())
-    .then(data => {
-      execRunning = !!data.running;
-      updateExecBtn();
-    })
-    .catch(() => {
-      execRunning = false;
-      updateExecBtn();
-    });
-}
-
-function execMode() {
-  const btn = document.getElementById('exec-btn');
-
-  if (execRunning) {
-    // Stop mode — show confirmation in the exec modal
-    openModal('exec-modal');
-    document.getElementById('exec-content').innerHTML = `
-      <div style="font-size:32px;margin-bottom:16px;">⏹</div>
-      <p style="color:var(--amber);font-size:14px;font-weight:600;margin-bottom:8px;">Parar OpenRat?</p>
-      <p style="color:var(--text3);font-size:13px;">Isso enviara um sinal de parada ao processo em background.</p>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;">
-        <button class="btn" onclick="closeModal('exec-modal')">Cancelar</button>
-        <button class="btn danger" onclick="doStop()">Parar</button>
-      </div>
-    `;
-    return;
-  }
-
-  // Check if there are configured keys (not placeholder)
-  const hasRealKeys = state.instances.some(inst =>
-    Object.values(inst.providers).some(p =>
-      (p.apiKeys || []).some(k =>
-        k && !k.includes('CHAVE') && !k.includes('AQUI') && !k.includes('YOUR') && k.length > 10
-      )
-    )
-  );
-
-  if (!hasRealKeys) {
-    openModal('exec-modal');
-    document.getElementById('exec-content').innerHTML = `
-      <div style="font-size:32px;margin-bottom:16px;">⚠️</div>
-      <p style="color:var(--amber);font-size:14px;font-weight:600;margin-bottom:8px;">Nenhuma chave real configurada</p>
-      <p style="color:var(--text3);font-size:13px;">Configure ao menos uma chave de API valida nos seus RATs antes de executar.</p>
-      <button class="btn" style="margin-top:16px;" onclick="closeModal('exec-modal')">OK</button>
-    `;
-    return;
-  }
-
-  // Start execution
-  openModal('exec-modal');
-  document.getElementById('exec-content').innerHTML = `
-    <div style="font-size:32px;margin-bottom:16px;">🐀</div>
-    <p style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:8px;">Iniciando OpenRat...</p>
-    <p style="color:var(--text3);font-size:13px;">${state.instances.length} instancia(s) configurada(s)</p>
-    <div style="margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--text3);">
-      Enviando configuracao para o servidor...
-    </div>
-  `;
-  doStart();
-}
-
-function doStop() {
-  closeModal('exec-modal');
-  const btn = document.getElementById('exec-btn');
-  btn.innerHTML = '⏳ Parando...';
-  btn.style.pointerEvents = 'none';
-
-  fetch('/openrat/stop', { method: 'POST' })
-    .then(r => r.json())
-    .then(() => {
-      execRunning = false;
-      updateExecBtn();
-      btn.style.pointerEvents = '';
-      notify('OpenRat parado!', '⏹');
-      // Double-check after a moment
-      setTimeout(checkExecStatus, 2000);
-    })
-    .catch(() => {
-      execRunning = false;
-      updateExecBtn();
-      btn.style.pointerEvents = '';
-      notify('Comando de parada enviado', '⏹');
-    });
-}
-
-function doStart() {
-  const btn = document.getElementById('exec-btn');
-  btn.innerHTML = '⏳ Iniciando...';
-  btn.style.pointerEvents = 'none';
-
-  saveState();
-  fetch('/openrat/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(state)
-  })
-  .then(r => r.json())
-  .then(data => {
-    execRunning = true;
-    updateExecBtn();
-    btn.style.pointerEvents = '';
-    closeModal('exec-modal');
-    notify('OpenRat rodando em background!', '▶');
-    // Confirm status after a moment
-    setTimeout(checkExecStatus, 3000);
-  })
-  .catch(err => {
-    execRunning = false;
-    updateExecBtn();
-    btn.style.pointerEvents = '';
-    document.getElementById('exec-content').innerHTML = `
-      <div style="font-size:32px;margin-bottom:16px;">❌</div>
-      <p style="color:var(--red);font-size:14px;font-weight:600;margin-bottom:8px;">Erro ao iniciar</p>
-      <p style="color:var(--text3);font-size:13px;">Nao foi possivel conectar ao servidor do manager.</p>
-      <p style="color:var(--text3);font-size:12px;margin-top:8px;">Verifique se o OpenRat Manager esta rodando:</p>
-      <code style="background:var(--bg3);padding:6px 10px;border-radius:4px;color:var(--green);font-size:11px;display:inline-block;margin-top:4px;">openrat manager</code>
-      <button class="btn" style="margin-top:16px;" onclick="closeModal('exec-modal')">Fechar</button>
-    `;
-  });
-}
-
-function updateExecBtn() {
-  const btn = document.getElementById('exec-btn');
-  if (!btn) return;
-  btn.style.pointerEvents = '';
-  if (execRunning) {
-    btn.className = 'exec-btn running-state';
-    btn.innerHTML = '⏹ Parar';
-  } else {
-    btn.className = 'exec-btn';
-    btn.innerHTML = '▶ Executar';
-  }
-}
-
 
 init();
 </script>

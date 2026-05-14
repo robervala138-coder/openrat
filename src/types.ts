@@ -1,6 +1,21 @@
 export type ProviderType = 'openai-compatible' | 'google-ai-studio' | 'xai'
 export type EndpointType = 'chat/completions' | 'responses'
-export type TargetId = 'openclaude' | 'openclaw' | 'vscode-openclaude'
+export type TargetId =
+  // ── Já existentes ─────────────────────────────────────────────────────────
+  | 'openclaude'         // Claude Code (Anthropic)
+  | 'openclaw'           // OpenClaw
+  | 'vscode-openclaude' // Extensão VS Code OpenClaude
+  // ── Novos ─────────────────────────────────────────────────────────────────
+  | 'aider'              // Aider (aider-chat.com)
+  | 'continue-dev'       // Continue.dev (VS Code / JetBrains)
+  | 'cline'              // Cline (VS Code extension)
+  | 'roo-code'           // Roo Code / Roo Cline (VS Code extension)
+  | 'opencode'           // OpenCode (SST)
+  | 'codex-cli'          // Codex CLI (OpenAI oficial)
+  | 'goose'              // Goose (Block / Square)
+  | 'cursor'             // Cursor editor
+  | 'amp'                // Amp (Sourcegraph)
+  | 'plandex'            // Plandex
 export type RotationStrategy = 'fill-first' | 'round-robin'
 
 export interface GatewayServerConfig {
@@ -130,5 +145,7 @@ export interface InstanceStatus {
   pid: number
   status: 'running' | 'stopped' | 'error'
   startedAt: number
+  masterKey?: string
+  defaultModel?: string
   errorMessage?: string
 }

@@ -1,18 +1,33 @@
 import type { KeyStats, ProviderProfile, ProviderStats } from './types.js'
 import { sanitizeKeyPreview } from './utils.js'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 interface KeyRecord {
   requests: number
   inputTokens: number
   outputTokens: number
   errors: number
   lastUsed: number | null
-  dailyReset: number
-  monthlyReset: number
   estimatedUsdToday: number
   estimatedUsdMonth: number
+  /** Start of current calendar day (midnight) as ms timestamp */
+  dayStart: number
+  /** Start of current calendar month (1st day midnight) as ms timestamp */
+  monthStart: number
+}
+
+/** Get midnight of the current day in local time */
+function startOfDay(ts: number): number {
+  const d = new Date(ts)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+/** Get midnight of the 1st of the current month in local time */
+function startOfMonth(ts: number): number {
+  const d = new Date(ts)
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
 }
 
 export class StatsTracker {
@@ -32,13 +47,28 @@ export class StatsTracker {
         outputTokens: 0,
         errors: 0,
         lastUsed: null,
-        dailyReset: now + DAY_MS,
-        monthlyReset: now + 30 * DAY_MS,
         estimatedUsdToday: 0,
         estimatedUsdMonth: 0,
+        dayStart: startOfDay(now),
+        monthStart: startOfMonth(now),
       })
     }
     return this.records.get(k)!
+  }
+
+  /** Check if we crossed a day or month boundary and reset counters accordingly */
+  private checkResets(rec: KeyRecord, now: number): void {
+    const todayStart = startOfDay(now)
+    if (rec.dayStart < todayStart) {
+      rec.estimatedUsdToday = 0
+      rec.dayStart = todayStart
+    }
+
+    const thisMonthStart = startOfMonth(now)
+    if (rec.monthStart < thisMonthStart) {
+      rec.estimatedUsdMonth = 0
+      rec.monthStart = thisMonthStart
+    }
   }
 
   recordRequest(
@@ -52,20 +82,41 @@ export class StatsTracker {
     const rec = this.getOrCreate(providerId, apiKey)
     const now = Date.now()
 
-    if (now > rec.dailyReset) {
-      rec.estimatedUsdToday = 0
-      rec.dailyReset = now + DAY_MS
-    }
-    if (now > rec.monthlyReset) {
-      rec.estimatedUsdMonth = 0
-      rec.monthlyReset = now + 30 * DAY_MS
-    }
+    this.checkResets(rec, now)
 
     rec.requests++
+    rec.lastUsed = now
+    if (isError) {
+      rec.errors++
+      return
+    }
+
     rec.inputTokens += inputTokens
     rec.outputTokens += outputTokens
-    rec.lastUsed = now
-    if (isError) rec.errors++
+
+    const inCost = ((profile.costPer1MInputTokens ?? 0) * inputTokens) / 1_000_000
+    const outCost = ((profile.costPer1MOutputTokens ?? 0) * outputTokens) / 1_000_000
+    const total = inCost + outCost
+    rec.estimatedUsdToday += total
+    rec.estimatedUsdMonth += total
+  }
+
+  /** Record token usage from a streaming SSE response (called after stream ends) */
+  recordStreamingUsage(
+    providerId: string,
+    apiKey: string,
+    profile: ProviderProfile,
+    inputTokens: number,
+    outputTokens: number,
+  ): void {
+    if (inputTokens === 0 && outputTokens === 0) return
+    const rec = this.getOrCreate(providerId, apiKey)
+    const now = Date.now()
+
+    this.checkResets(rec, now)
+
+    rec.inputTokens += inputTokens
+    rec.outputTokens += outputTokens
 
     const inCost = ((profile.costPer1MInputTokens ?? 0) * inputTokens) / 1_000_000
     const outCost = ((profile.costPer1MOutputTokens ?? 0) * outputTokens) / 1_000_000
@@ -81,6 +132,8 @@ export class StatsTracker {
     unavailableUntil?: number,
   ): KeyStats {
     const rec = this.getOrCreate(providerId, apiKey)
+    // Ensure resets are applied before reading
+    this.checkResets(rec, Date.now())
     return {
       providerId,
       keyPreview: sanitizeKeyPreview(apiKey),
@@ -97,11 +150,24 @@ export class StatsTracker {
   }
 
   getEstimatedUsdToday(providerId: string, apiKey: string): number {
-    return this.getOrCreate(providerId, apiKey).estimatedUsdToday
+    const rec = this.getOrCreate(providerId, apiKey)
+    this.checkResets(rec, Date.now())
+    return rec.estimatedUsdToday
   }
 
   getEstimatedUsdMonth(providerId: string, apiKey: string): number {
-    return this.getOrCreate(providerId, apiKey).estimatedUsdMonth
+    const rec = this.getOrCreate(providerId, apiKey)
+    this.checkResets(rec, Date.now())
+    return rec.estimatedUsdMonth
+  }
+
+  /** Clean up old records for keys no longer in config. Call periodically. */
+  pruneStaleKeys(activeKeys: Set<string>): void {
+    for (const k of this.records.keys()) {
+      if (!activeKeys.has(k)) {
+        this.records.delete(k)
+      }
+    }
   }
 
   buildProviderStats(

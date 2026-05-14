@@ -7,6 +7,11 @@ import type { GatewayConfig, MultiConfig, InstanceStatus } from './types.js'
 export interface RunningInstance {
   status: InstanceStatus
   gateway: GatewayServer
+  dashboard: DashboardServer
+}
+
+function defaultModel(config: GatewayConfig): string {
+  return config.providers[config.routes.default].model
 }
 
 /**
@@ -31,6 +36,7 @@ export async function startAllInstances(config: MultiConfig): Promise<RunningIns
 
       results.push({
         gateway,
+        dashboard,
         status: {
           name: inst.name,
           port,
@@ -38,6 +44,8 @@ export async function startAllInstances(config: MultiConfig): Promise<RunningIns
           pid: process.pid,
           status: 'running',
           startedAt: Date.now(),
+          masterKey: normalized.server?.masterKey ?? 'openrat-local',
+          defaultModel: defaultModel(normalized),
         },
       })
     } catch (error) {
@@ -45,6 +53,7 @@ export async function startAllInstances(config: MultiConfig): Promise<RunningIns
       process.stderr.write(`❌ [${inst.name}] Falha ao iniciar: ${msg}\n`)
       results.push({
         gateway,
+        dashboard,
         status: {
           name: inst.name,
           port,
@@ -52,6 +61,8 @@ export async function startAllInstances(config: MultiConfig): Promise<RunningIns
           pid: process.pid,
           status: 'error',
           startedAt: Date.now(),
+          masterKey: normalized.server?.masterKey ?? 'openrat-local',
+          defaultModel: defaultModel(normalized),
           errorMessage: msg,
         },
       })
@@ -69,25 +80,25 @@ export function printInstancesSummary(instances: RunningInstance[]): void {
 
   process.stdout.write('\n')
   process.stdout.write('╔══════════════════════════════════════════════════════════════╗\n')
-  process.stdout.write('║  🐀  OpenRat Multi — Instâncias em execução                 ║\n')
+  process.stdout.write('║ 🐀 OpenRat Multi — Instâncias em execução                  ║\n')
   process.stdout.write('╠══════════════════════════════════════════════════════════════╣\n')
 
   for (const { status: s } of running) {
     const name = s.name.padEnd(12)
     const gw = `http://127.0.0.1:${s.port}`.padEnd(28)
     const dash = `http://127.0.0.1:${s.dashboardPort}`
-    process.stdout.write(`║  ✅ ${name}  Gateway: ${gw}  Dashboard: ${dash}\n`)
+    process.stdout.write(`║ ✅ ${name} Gateway: ${gw} Dashboard: ${dash}\n`)
   }
 
   if (failed.length > 0) {
     process.stdout.write('╠══════════════════════════════════════════════════════════════╣\n')
     for (const { status: s } of failed) {
-      process.stdout.write(`║  ❌ ${s.name.padEnd(12)}  ERRO: ${(s.errorMessage ?? '').slice(0, 46)}\n`)
+      process.stdout.write(`║ ❌ ${s.name.padEnd(12)} ERRO: ${(s.errorMessage ?? '').slice(0, 46)}\n`)
     }
   }
 
   process.stdout.write('╠══════════════════════════════════════════════════════════════╣\n')
-  process.stdout.write(`║  Total: ${running.length} rodando, ${failed.length} com erro`.padEnd(63) + '║\n')
+  process.stdout.write(`║ Total: ${running.length} rodando, ${failed.length} com erro`.padEnd(63) + '║\n')
   process.stdout.write('╚══════════════════════════════════════════════════════════════╝\n')
-  process.stdout.write('\n   Pressione Ctrl+C para parar todas as instâncias.\n\n')
+  process.stdout.write('\n Pressione Ctrl+C para parar todas as instâncias.\n\n')
 }

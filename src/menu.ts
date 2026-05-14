@@ -1,8 +1,23 @@
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import http from 'node:http'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+/** Read JSON body from an HTTP request */
+function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8')
+      if (!raw.trim()) { resolve({}); return }
+      try { resolve(JSON.parse(raw) as Record<string, unknown>) } catch (e) { reject(e) }
+    })
+    req.on('error', reject)
+  })
+}
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 const A = {
@@ -238,8 +253,8 @@ async function terminalSubMenu(): Promise<string | null> {
         stdin.removeListener('data', handler)
         stdin.setRawMode(false)
         stdin.pause()
-        stdout.write(A.show)
-        process.exit(0)
+          stdout.write(A.show + '\n')
+          resolve(null)
       }
     })
   })
@@ -248,10 +263,12 @@ async function terminalSubMenu(): Promise<string | null> {
 // ─── Manager HTTP server ───────────────────────────────────────────────────────
 function findManagerHtml(): string | null {
   const candidates = [
-    path.join(process.cwd(), 'openrat-manager.html'),
-    path.join(process.env['HOME'] ?? '', '.openrat', 'manager.html'),
-    // bundled alongside the dist folder
+    // 1. ~/.openrat/manager.html — primary location (works from any directory)
+    path.join(os.homedir(), '.openrat', 'manager.html'),
+    // 2. bundled alongside the dist folder
     path.join(fileURLToPath(import.meta.url), '..', '..', 'openrat-manager.html'),
+    // 3. CWD fallback
+    path.join(process.cwd(), 'openrat-manager.html'),
   ]
   for (const p of candidates) {
     try {
@@ -271,10 +288,26 @@ function openBrowser(url: string): void {
   try { execSync(cmd, { stdio: 'ignore' }) } catch {}
 }
 
+let managerServer: http.Server | null = null
+
 async function serveManager(port = 4399): Promise<void> {
   const htmlPath = findManagerHtml()
 
-  const server = http.createServer((req, res) => {
+  managerServer = http.createServer(async (req, res) => {
+    // ── CORS for local manager — allow any localhost origin ──────────
+    const origin = req.headers.origin
+    if (origin) {
+      try {
+        const originUrl = new URL(origin)
+        if (originUrl.hostname === '127.0.0.1' || originUrl.hostname === 'localhost') {
+          res.setHeader('Access-Control-Allow-Origin', origin)
+        }
+      } catch {}
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+
     // ── serve static manager HTML ──────────────────────────────────
     if (req.url === '/' || req.url === '/index.html') {
       const html = htmlPath
@@ -286,11 +319,122 @@ async function serveManager(port = 4399): Promise<void> {
       return
     }
 
+    // ── Start gateway in background ────────────────────────────────
+    if (req.url === '/openrat/start' && req.method === 'POST') {
+      try {
+        const body = await readJsonBody(req)
+        const configPath = path.join(os.homedir(), '.openrat', 'openrat.multi.json')
+        // Write the multi-config from the manager UI
+        const { writeJsonFile } = await import('./fs.js')
+        await writeJsonFile(configPath, body)
+
+        // Find the openrat binary — prefer global install, fallback to local dist
+        const localEntry = path.join(path.dirname(fileURLToPath(import.meta.url)), 'index.js')
+        const openratBin = fs.existsSync(localEntry) ? localEntry : 'openrat'
+
+        // Calculate URLs so the daemon can write them to the info file for the tray
+        const basePort = (body as Record<string, unknown>).basePort as number ?? 4419
+        const firstInstancePort = basePort
+        const centralDashboardPort = 4400 // Multi-dashboard central port
+        const pidFile = path.join(os.homedir(), '.openrat', 'openrat.pid')
+        const infoFile = pidFile + '.info'
+
+        // Spawn openrat with --daemon so it creates PID file + tray icon
+        const child = spawn(openratBin, [
+          'multi', 'start', '--config', configPath, '--daemon',
+        ], {
+          detached: true,
+          stdio: 'ignore',
+          env: {
+            ...process.env,
+            OPENRAT_BG_PID_FILE: pidFile,
+            OPENRAT_BG_INFO_FILE: infoFile,
+            OPENRAT_BG_DASHBOARD_URL: `http://127.0.0.1:${centralDashboardPort}`,
+            OPENRAT_BG_GATEWAY_URL: `http://127.0.0.1:${firstInstancePort}`,
+          },
+        })
+        child.unref()
+
+        // Wait a short moment for the daemon to write its PID file
+        await new Promise(r => setTimeout(r, 500))
+
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true, pid: child.pid, configPath }))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: msg }))
+      }
+      return
+    }
+
+    // ── Stop running gateway ───────────────────────────────────────
+    if (req.url === '/openrat/stop' && req.method === 'POST') {
+      let stopped = false
+      // 1. Try PID file
+      try {
+        const pidFile = path.join(os.homedir(), '.openrat', 'openrat.pid')
+        const pidRaw = fs.readFileSync(pidFile, 'utf8').trim()
+        const pid = Number(pidRaw)
+        if (pid && !isNaN(pid)) {
+          try { process.kill(pid, 'SIGTERM'); stopped = true } catch {}
+        }
+      } catch {}
+      // 2. Try stop script
+      const stopScript = path.join(os.homedir(), '.openrat', 'stop.sh')
+      if (fs.existsSync(stopScript)) {
+        try { execSync(`bash "${stopScript}"`, { stdio: 'ignore' }); stopped = true } catch {}
+      }
+      // 3. Try to find openrat processes by port and kill them
+      try {
+        const portsToCheck = [4400] // central dashboard
+        for (let p = 4419; p < 4419 + 30; p++) {
+          portsToCheck.push(p) // both gateway and dashboard ports
+        }
+        for (const p of portsToCheck) {
+          try {
+            const out = execSync(`lsof -ti :${p} 2>/dev/null || true`, { encoding: 'utf8' }).trim()
+            if (out) {
+              for (const pidStr of out.split('\n')) {
+                const p2 = Number(pidStr.trim())
+                if (p2 && !isNaN(p2)) {
+                  try { process.kill(p2, 'SIGTERM'); stopped = true } catch {}
+                }
+              }
+            }
+          } catch {}
+        }
+      } catch {}
+      // 4. Nuclear: pkill openrat
+      if (!stopped) {
+        try { execSync('pkill -f "openrat.*multi.*start" 2>/dev/null || true', { stdio: 'ignore' }); stopped = true } catch {}
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ ok: true, stopped }))
+      return
+    }
+
+    // ── Check if gateway is running ────────────────────────────────
+    if (req.url === '/openrat/status' && req.method === 'GET') {
+      const pidFile = path.join(os.homedir(), '.openrat', 'openrat.pid')
+      let running = false
+      try {
+        const pidRaw = fs.readFileSync(pidFile, 'utf8').trim()
+        const pid = Number(pidRaw)
+        if (pid && !isNaN(pid)) {
+          try { process.kill(pid, 0); running = true } catch {}
+        }
+      } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ running }))
+      return
+    }
+
     res.writeHead(404)
     res.end('Not found')
   })
 
-  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve))
+  await new Promise<void>((resolve) => managerServer!.listen(port, '127.0.0.1', resolve))
 
   const url = `http://127.0.0.1:${port}`
   const out = process.stdout
@@ -305,7 +449,7 @@ async function serveManager(port = 4399): Promise<void> {
     out.write(line(`  ${A.green}✓${A.reset} ${A.gray}Carregando: ${path.basename(htmlPath)}${A.reset}`) + '\n')
   } else {
     out.write(line(`  ${A.amber}⚠${A.reset} ${A.gray}openrat-manager.html não encontrado${A.reset}`) + '\n')
-    out.write(line(`  ${A.dgray}  Coloque o arquivo em: ${process.cwd()}${A.reset}`) + '\n')
+    out.write(line(`  ${A.dgray}  Coloque o arquivo em: ~/.openrat/manager.html${A.reset}`) + '\n')
   }
 
   out.write(blank() + '\n')
@@ -339,7 +483,7 @@ const FALLBACK_HTML = `<!DOCTYPE html>
 <div class="box">
   <h1>🐀 OpenRat Manager</h1>
   <p>Arquivo <code>openrat-manager.html</code> não encontrado.</p>
-  <p>Coloque-o em: <code>${process.cwd()}</code></p>
+  <p>Coloque-o em: <code>~/.openrat/manager.html</code></p>
 </div>
 </body>
 </html>`
@@ -354,8 +498,8 @@ export async function showStartupMenu(): Promise<{ action: 'manager' | 'terminal
   const choice = await arrowMenu()
 
   if (choice === null) {
-    out.write(A.show)
-    process.exit(0)
+  out.write(A.show + '\n')
+  return { action: 'manager' }
   }
 
   if (choice === 0) {

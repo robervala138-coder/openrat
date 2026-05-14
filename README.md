@@ -5,12 +5,12 @@
 **Local OpenAI-compatible gateway — route requests across multiple AI providers with smart key rotation, spend limits, scheduling, and a visual dashboard.**
 
 [![CI](https://github.com/robervala138-coder/openrat/actions/workflows/ci.yml/badge.svg)](https://github.com/robervala138-coder/openrat/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.0.0-green)](https://nodejs.org)
 
 > Pure Node.js. No database. No Docker. No Bun. No external runtime dependencies.
 
-[Features](#features) · [Quick Start](#quick-start) · [Configuration](#configuration) · [CLI Reference](#cli-reference) · [Integrations](#integrations) · [Multi-Instance Mode](#multi-instance-mode) · [Contributing](CONTRIBUTING.md)
+[Features](#features) · [Quick Start](#quick-start) · [Configuration](#configuration) · [CLI Reference](#cli-reference) · [Integrations](#integrations) · [Background Mode](#background-mode) · [Multi-Instance Mode](#multi-instance-mode) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -20,10 +20,10 @@
 
 OpenRat is a local HTTP gateway that exposes an **OpenAI-compatible API** (`/v1/chat/completions`, `/v1/responses`, `/v1/models`) and forwards requests to the real providers you configure — Google AI Studio, xAI (Grok), DeepSeek, OpenRouter, or any OpenAI-compatible service.
 
-You point your client (Claude Code, VS Code, LangChain, openai SDK…) to `http://127.0.0.1:4419` once, and OpenRat handles the rest: which provider to use, which key is available, how much has been spent, whether it's within the scheduled window, automatic fallback, and more.
+You point your client (Claude Code, Codex CLI, Aider, Continue.dev, Cline, Cursor…) to `http://127.0.0.1:4419` once, and OpenRat handles the rest: which provider to use, which key is available, how much has been spent, whether it's within the scheduled window, automatic fallback, and more.
 
 ```
-Your client (LangChain, Claude Code, VS Code, openai SDK...)
+Your client (Claude Code, Codex CLI, Aider, Cline, Cursor, openai SDK...)
         │
         ▼
   http://127.0.0.1:4419  ◄── OpenRat Gateway
@@ -53,7 +53,8 @@ Your client (LangChain, Claude Code, VS Code, openai SDK...)
 | Simple JSON config | ✅ |
 | No database | ✅ |
 | Streaming (SSE) support | ✅ |
-| Auto-configure Claude Code / VS Code / OpenClaw | ✅ |
+| Auto-configure 13 AI coding tools | ✅ |
+| Background / daemon mode | ✅ |
 
 ---
 
@@ -104,7 +105,9 @@ Use the arrow keys to choose between the visual browser manager or CLI commands.
 openrat init
 ```
 
-This creates `openrat.config.json` in the current directory. Edit it and replace the placeholder API keys with your real ones.
+This creates `~/.openrat/openrat.config.json` by default. Edit it and replace the placeholder API keys with your real ones.
+
+To create the config in another location, pass `--config PATH`.
 
 > 💡 **Tip:** For your real keys, use `openrat.config.local.json` — it's already in `.gitignore`.
 
@@ -113,13 +116,14 @@ This creates `openrat.config.json` in the current directory. Edit it and replace
 ```jsonc
 {
   "server": {
-    "host": "127.0.0.1",      // Listen address (default: 127.0.0.1)
-    "port": 4419,              // Gateway port (default: 4419)
+    "host": "127.0.0.1",         // Listen address (default: 127.0.0.1)
+    "port": 4419,                // Gateway port (default: 4419)
+    "dashboardPort": 4420,       // Dashboard port (default: port + 1)
     "masterKey": "openrat-local", // Auth key sent by your client
-    "rotation": "round-robin"  // "round-robin" | "fill-first"
+    "rotation": "round-robin"    // "round-robin" | "fill-first"
   },
   "routes": {
-    "default": "gemini-flash"  // Fallback provider ID
+    "default": "gemini-flash"    // Fallback provider ID
   },
   "providers": {
     "gemini-flash": {
@@ -147,7 +151,9 @@ This creates `openrat.config.json` in the current directory. Edit it and replace
       "type": "openai-compatible",
       "model": "deepseek-chat",
       "baseUrl": "https://api.deepseek.com/v1",
-      "apiKeys": ["sk-key-1", "sk-key-2"]
+      "apiKeys": ["sk-key-1", "sk-key-2"],
+      "headers": { "X-Custom-Header": "value" },   // Optional extra request headers
+      "supportedEndpoints": ["chat/completions"]   // Restrict accepted endpoints
     }
   }
 }
@@ -163,6 +169,22 @@ See [`examples/openrat.config.example.json`](examples/openrat.config.example.jso
 | `xai` | xAI Grok models |
 | `openai-compatible` | DeepSeek, OpenRouter, any OpenAI-compatible API |
 
+> **Important:** `openai-compatible` providers **must** define `baseUrl`. There is no default URL for this type.
+
+### Provider advanced fields
+
+| Field | Type | Description |
+|---|---|---|
+| `aliases` | `string[]` | Extra model name aliases that route to this provider |
+| `headers` | `Record<string, string>` | Additional HTTP headers sent with every request to this provider |
+| `supportedEndpoints` | `"chat/completions" \| "responses"` | Restricts which endpoints this provider accepts. Defaults: `google-ai-studio` → `["chat/completions"]`; `xai` → `["chat/completions"]`; `openai-compatible` → both. |
+| `costPer1MInputTokens` | `number` | USD cost per 1M input tokens (used for spend tracking) |
+| `costPer1MOutputTokens` | `number` | USD cost per 1M output tokens (used for spend tracking) |
+| `spendLimit.dailyUsd` | `number` | Max USD spend per day for this provider |
+| `spendLimit.monthlyUsd` | `number` | Max USD spend per month for this provider |
+| `schedule.fromHour` | `number` | Hour (0–23) when this provider becomes active |
+| `schedule.toHour` | `number` | Hour (0–23) when this provider becomes inactive |
+
 ### Key rotation strategies
 
 | Strategy | Behavior |
@@ -176,9 +198,10 @@ When a key returns an error, it is placed on cooldown automatically:
 
 | Error | Cooldown |
 |---|---|
-| 401 Unauthorized | 24 hours |
+| 401 / 403 Unauthorized / Forbidden | 10 minutes |
+| 402 / quota | 30 minutes |
 | 429 Rate limit | 60 seconds |
-| 5xx Server error | 30 seconds |
+| 5xx Server error | 15 seconds |
 | Network error | 10 seconds |
 
 ---
@@ -199,6 +222,8 @@ openrat install [--config PATH] [--target TARGET]  # Auto-configure a client
 openrat --help                         # Show help
 ```
 
+> **Tip:** Running `openrat install` without `--target` opens an interactive list of detected tools on your system, so you can pick one with the arrow keys.
+
 ### Multi-instance commands
 
 ```bash
@@ -210,9 +235,27 @@ openrat multi start [--config PATH] [--central-dashboard-port PORT]  # Start all
 
 | Option | Description |
 |---|---|
-| `--config PATH` | Path to config file (default: `./openrat.config.json`) |
-| `--target TARGET` | Install target: `openclaude`, `openclaw`, `vscode-openclaude` |
+| `--config PATH` | Path to config file (default: `~/.openrat/openrat.config.json`; multi mode defaults to `~/.openrat/openrat.multi.json`) |
+| `--target TARGET` | Install target (see table below) |
 | `--central-dashboard-port PORT` | Central dashboard port in multi mode (default: `4400`) |
+
+### Supported install targets
+
+| Target | Tool | Config file modified |
+|---|---|---|
+| `openclaude` | Claude Code | `~/.claude/settings.json` + launcher |
+| `openclaw` | OpenClaw | `~/.openclaw/openclaw.json` |
+| `vscode-openclaude` | VS Code (OpenClaude ext.) | VS Code `settings.json` + launcher |
+| `aider` | Aider | `~/.aider.conf.yml` |
+| `continue-dev` | Continue.dev | `~/.continue/config.json` |
+| `cline` | Cline (VS Code) | VS Code `settings.json` |
+| `roo-code` | Roo Code (VS Code) | VS Code `settings.json` |
+| `opencode` | OpenCode (SST) | `~/.config/opencode/config.json` |
+| `codex-cli` | Codex CLI (OpenAI) | `~/.codex/config.json` + launcher |
+| `goose` | Goose (Block) | `~/.config/goose/config.yaml` |
+| `cursor` | Cursor | Cursor `settings.json` |
+| `amp` | Amp (Sourcegraph) | `~/.config/amp/settings.json` |
+| `plandex` | Plandex | launcher only |
 
 ---
 
@@ -228,34 +271,149 @@ export OPENAI_API_KEY="openrat-local"
 export OPENAI_MODEL="gemini-2.5-flash"   # any configured alias
 ```
 
+---
+
 ### Claude Code
 
 ```bash
 openrat install --target openclaude
 ```
 
-Or manually in `~/.claude/settings.json`:
+Configures `~/.claude/settings.json` with `agentModels` and `agentRouting`, and creates a launcher at `~/.local/bin/openclaude-keymux` with `CLAUDE_CODE_USE_OPENAI=1`. All sub-agents spawned by Claude Code also go through OpenRat.
 
-```json
-{
-  "env": {
-    "ANTHROPIC_API_KEY": "openrat-local",
-    "ANTHROPIC_BASE_URL": "http://127.0.0.1:4419"
-  }
-}
-```
+---
 
-### VS Code (OpenClaude extension)
+### Codex CLI (OpenAI)
 
 ```bash
-openrat install --target vscode-openclaude
+openrat install --target codex-cli
 ```
+
+Writes `~/.codex/config.json` and creates a `codex-openrat` launcher. Use `codex-openrat` instead of `codex` to route requests through OpenRat.
+
+> Requires: `npm i -g @openai/codex`
+
+---
+
+### Aider
+
+```bash
+openrat install --target aider
+```
+
+Writes `~/.aider.conf.yml` with `openai-api-base` and `openai-api-key`. After this, just run `aider` normally — it reads the config automatically.
+
+> Requires: `pip install aider-chat`
+
+---
+
+### Continue.dev
+
+```bash
+openrat install --target continue-dev
+```
+
+Injects all configured providers as OpenAI-compatible models in `~/.continue/config.json`. Select "OpenRat — \<model\>" from the model picker inside VS Code or JetBrains.
+
+---
+
+### Cline (VS Code)
+
+```bash
+openrat install --target cline
+```
+
+Sets `cline.apiProvider = "openai"`, `cline.openAiBaseUrl`, `cline.openAiApiKey`, and `cline.openAiModelId` in the VS Code `settings.json`. Reload the window to apply.
+
+---
+
+### Roo Code (VS Code)
+
+```bash
+openrat install --target roo-code
+```
+
+Sets the equivalent `roo-cline.*` keys in the VS Code `settings.json`. Reload the window to apply.
+
+---
+
+### OpenCode (SST)
+
+```bash
+openrat install --target opencode
+```
+
+Writes `~/.config/opencode/config.json` with an OpenAI-compatible provider pointing to the local gateway. Run `opencode` normally after install.
+
+> Requires: `npm i -g opencode-ai`
+
+---
+
+### Goose (Block)
+
+```bash
+openrat install --target goose
+```
+
+Writes `~/.config/goose/config.yaml` with `GOOSE_PROVIDER=openai` and the gateway URL. Run `goose session` normally after install.
+
+---
+
+### Cursor
+
+```bash
+openrat install --target cursor
+```
+
+Injects `cursor.general.openAIBaseUrl` and `cursor.general.openAIApiKey` into Cursor's `settings.json`. Restart Cursor to apply.
+
+> Note: Cursor's UI Settings page may override these values. Verify under **Settings → Models** after restarting.
+
+---
+
+### Amp (Sourcegraph)
+
+```bash
+openrat install --target amp
+```
+
+Writes `~/.config/amp/settings.json` with an `openai-compatible` provider. Run `amp` normally after install.
+
+> Requires: `npm i -g @sourcegraph/amp`
+
+---
+
+### Plandex
+
+```bash
+openrat install --target plandex
+```
+
+Creates a `plandex-openrat` launcher with `OPENAI_API_KEY` and `OPENAI_API_BASE_URL` pre-set. Use `plandex-openrat` instead of `plandex`.
+
+> Requires: `curl -sL https://plandex.ai/install.sh | bash`
+
+---
 
 ### OpenClaw
 
 ```bash
 openrat install --target openclaw
 ```
+
+Adds a `llm-pool` custom provider to `~/.openclaw/openclaw.json` pointing to the local gateway.
+
+---
+
+### VS Code — OpenClaude extension
+
+```bash
+openrat install --target vscode-openclaude
+```
+
+Registers the launcher path in the VS Code `settings.json` under `openclaude.launchCommand`.
+
+---
 
 ### Python — openai SDK
 
@@ -309,6 +467,34 @@ model: "flash"               →  provider gemini-flash (via alias)
 model: "unknown-model"       →  routes.default provider (fallback)
 ```
 
+### Health check
+
+```bash
+curl http://127.0.0.1:4419/health
+# {"ok":true,"version":"2.0.0"}
+```
+
+Useful for scripting, CI/CD pipelines, or confirming the gateway is up before sending requests.
+
+---
+
+## Background Mode
+
+After starting the gateway with `openrat gateway` or `openrat multi start`, the interactive post-start menu offers a **"Run in background"** option. This detaches OpenRat from your terminal completely:
+
+- The process re-spawns itself in detached mode and the terminal is released immediately
+- A **PID file** is written to `~/.openrat/openrat.pid`
+- A **stop script** is created at `~/.openrat/stop.sh`
+- On Linux with `python3` + `gir1.2-appindicator3` installed, a **system tray icon** appears with "Open Dashboard" and "Stop OpenRat" menu items
+
+**To stop a background instance:**
+
+```bash
+bash ~/.openrat/stop.sh
+```
+
+If the tray icon is unavailable (not Linux, or missing python3/GTK), OpenRat continues running silently in background and logs a note to `~/.openrat/openrat.log`.
+
 ---
 
 ## Multi-Instance Mode
@@ -336,6 +522,35 @@ openrat multi start
 The **central dashboard** launches at port `4400` by default and shows all instances in one view.
 
 Config example: [`examples/openrat.multi.example.json`](examples/openrat.multi.example.json)
+
+### Multi-instance config reference
+
+```jsonc
+{
+  "basePort": 4419,      // Base port for auto-numbering (optional).
+                         // If set, you can omit "port" from each instance —
+                         // instance 0 = basePort, instance 1 = basePort+2, etc.
+  "instances": [
+    {
+      "name": "rat-1",
+      "port": 4419,               // Gateway port (optional if basePort is set)
+      "dashboardPort": 4420,      // Dashboard port (default: port + 1)
+      "masterKey": "openrat-local",
+      "rotation": "round-robin",
+      "routes": { "default": "openrouter" },
+      "providers": {
+        "openrouter": {
+          "type": "openai-compatible",
+          "model": "tencent/hy3-preview:free",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "apiKeys": ["sk-or-v1-YOUR-KEY-1"],
+          "supportedEndpoints": ["chat/completions"]
+        }
+      }
+    }
+  ]
+}
+```
 
 ---
 
@@ -365,31 +580,27 @@ openrat/
 │   ├── providers.ts        # Provider resolution by model/alias
 │   ├── stats.ts            # Token + cost tracking (in-memory)
 │   ├── healthcheck.ts      # API key validation logic
-│   ├── install.ts          # Client auto-configuration
+│   ├── install.ts          # Auto-configuration for 13 AI tools
 │   ├── detect.ts           # Detects installed AI clients
 │   ├── menu.ts             # Interactive terminal menu + manager server
+│   ├── background.ts       # Background / daemon mode (PID file, stop script)
+│   ├── tray.ts             # System tray icon (Linux, python3 + GTK)
 │   ├── types.ts            # Shared TypeScript types
 │   ├── utils.ts            # Shared helpers
 │   └── fs.ts               # JSON file read/write helpers
 ├── test/
-│   ├── config.test.ts          # Config normalization & validation tests
-│   ├── install.test.ts         # Install command tests
-│   └── multi-config.test.ts    # Multi-instance port resolution tests
+│   ├── config.test.ts
+│   ├── install.test.ts
+│   └── multi-config.test.ts
 ├── examples/
-│   ├── openrat.config.example.json  # Single-instance config example
-│   └── openrat.multi.example.json   # Multi-instance config example
-├── openrat-manager.html        # Standalone visual manager (browser)
-├── openrat.multi.json          # Multi-instance config (placeholder)
-├── .github/
-│   ├── workflows/ci.yml        # GitHub Actions CI
-│   ├── ISSUE_TEMPLATE/         # Bug report & feature request templates
-│   └── PULL_REQUEST_TEMPLATE/  # PR template
+│   ├── openrat.config.example.json
+│   └── openrat.multi.example.json
+├── openrat-manager.html    # Standalone visual manager UI (opened by `openrat manager`)
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE
 ├── package.json
-├── tsconfig.json
-└── .gitignore
+└── tsconfig.json
 ```
 
 ### Request flow
@@ -398,14 +609,14 @@ openrat/
 Client → Gateway (port 4419)
   │
   ├─ Authenticate masterKey (Authorization: Bearer or X-API-Key)
-  ├─ Parse request JSON body
+  ├─ Parse request JSON body (max 10 MB)
   ├─ Resolve provider (by "model" field or configured aliases)
   ├─ Check: schedule active? spend limit OK?
   ├─ Select available key (fill-first or round-robin)
   │    └─ Filters out keys on cooldown or with spend-limit reached
   ├─ Forward request to real provider
   ├─ On retryable failure: mark cooldown, try next key
-  ├─ Track tokens and cost in StatsTracker (JSON responses only)
+  ├─ Track tokens and cost in StatsTracker
   └─ Pipe response back to client (supports SSE streaming)
 ```
 

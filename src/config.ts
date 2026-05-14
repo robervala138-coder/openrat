@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 
 import { readJsonFile } from './fs.js'
@@ -7,6 +8,7 @@ import { expandHome, unique } from './utils.js'
 const DEFAULT_MASTER_KEY = 'openrat-local'
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 4419
+const OPENRAT_HOME = path.join(os.homedir(), '.openrat')
 
 const DEFAULT_ENDPOINTS: Record<ProviderProfile['type'], EndpointType[]> = {
   'openai-compatible': ['chat/completions', 'responses'],
@@ -20,8 +22,8 @@ const DEFAULT_BASE_URLS: Record<ProviderProfile['type'], string | undefined> = {
   xai: 'https://api.x.ai/v1',
 }
 
-export function getDefaultConfigPath(cwd = process.cwd()): string {
-  return path.join(cwd, 'openrat.config.json')
+export function getDefaultConfigPath(): string {
+  return path.join(OPENRAT_HOME, 'openrat.config.json')
 }
 
 export async function loadConfig(configPath: string): Promise<GatewayConfig> {

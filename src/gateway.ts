@@ -1,7 +1,7 @@
 import http from 'node:http'
 import { URL } from 'node:url'
 
-import type { EndpointType, GatewayConfig, ProviderProfile, RotationStrategy } from './types.js'
+import type { EndpointType, GatewayConfig, KeyStats, ProviderProfile, RotationStrategy } from './types.js'
 import { buildModelsPayload, resolveProvider, supportsEndpoint } from './providers.js'
 import { StatsTracker } from './stats.js'
 import { normalizeBaseUrl, sanitizeKeyPreview, sleep } from './utils.js'
@@ -9,12 +9,20 @@ import { normalizeBaseUrl, sanitizeKeyPreview, sleep } from './utils.js'
 interface UpstreamFailure { status?: number; body?: string }
 interface KeyState { unavailableUntil: number; spendLimitHit: boolean }
 
-const RETRYABLE_STATUSES = new Set([401, 402, 403, 408, 409, 429, 500, 502, 503, 504])
+// Only retry on statuses where a different key might succeed
+// 401/403 = key is definitely invalid, skip to next key but don't retry same key
+// 429 = rate limit, try another key
+// 5xx = server error, try another key
+const RETRYABLE_STATUSES = new Set([402, 408, 429, 500, 502, 503, 504])
+
+const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
 
 export class GatewayServer {
   private readonly keyState = new Map<string, KeyState>()
   private readonly rrIndex = new Map<string, number>()
   private readonly stats = new StatsTracker()
+  private server: http.Server | null = null
+  private pruneInterval: ReturnType<typeof setInterval> | null = null
 
   constructor(private readonly config: GatewayConfig) {}
 
@@ -22,9 +30,19 @@ export class GatewayServer {
     const host = this.config.server?.host ?? '127.0.0.1'
     const port = this.config.server?.port ?? 4419
 
-    const server = http.createServer(async (req, res) => {
-      // CORS — permite que o dashboard (porta diferente) acesse o gateway
-      res.setHeader('Access-Control-Allow-Origin', '*')
+    this.server = http.createServer(async (req, res) => {
+      // CORS — restrict to same-origin / localhost dashboards only
+      const origin = req.headers.origin
+      if (origin) {
+        try {
+          const originUrl = new URL(origin)
+          if (originUrl.hostname === '127.0.0.1' || originUrl.hostname === 'localhost') {
+            res.setHeader('Access-Control-Allow-Origin', origin)
+          }
+        } catch {
+          // Invalid origin — no CORS header
+        }
+      }
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key')
 
@@ -38,16 +56,37 @@ export class GatewayServer {
       catch (error) {
         const message = error instanceof Error ? error.message : 'Erro inesperado'
         if (!res.headersSent) {
-          res.writeHead(500, { 'content-type': 'application/json' })
+          const status = (error instanceof Error && error.message === 'Chave mestre inválida.') ? 401 : 500
+          res.writeHead(status, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ error: { message } }))
         }
       }
     })
 
-    await new Promise<void>((resolve) => { server.listen(port, host, resolve) })
+    await new Promise<void>((resolve) => { this.server!.listen(port, host, resolve) })
     const dashboardPort = this.config.server?.dashboardPort ?? port + 1
     process.stdout.write(`\n🐀 OpenRat gateway em http://${host}:${port}\n`)
-    process.stdout.write(`   Dashboard: http://${host}:${dashboardPort}\n\n`)
+    process.stdout.write(`  Dashboard: http://${host}:${dashboardPort}\n\n`)
+
+    // Prune stale stats keys every 5 minutes
+    this.pruneInterval = setInterval(() => {
+      const activeKeys = new Set<string>()
+      for (const [providerId, profile] of Object.entries(this.config.providers)) {
+        for (const apiKey of profile.apiKeys) {
+          activeKeys.add(`${providerId}::${apiKey}`)
+        }
+      }
+      this.stats.pruneStaleKeys(activeKeys)
+    }, 5 * 60_000)
+  }
+
+  /** Stop the server gracefully */
+  async close(): Promise<void> {
+    if (this.pruneInterval) clearInterval(this.pruneInterval)
+    if (!this.server) return
+    return new Promise((resolve) => {
+      this.server!.close(() => resolve())
+    })
   }
 
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
@@ -71,7 +110,9 @@ export class GatewayServer {
 
     // ── models ───────────────────────────────────────────────────────────────
     if (pathname === '/v1/models' && req.method === 'GET') {
-      this.checkMasterKey(req)
+      // /v1/models is a read-only endpoint — allow without masterKey for
+      // browser navigation and tool compatibility.  Write endpoints (POST)
+      // still require masterKey.
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify(buildModelsPayload(this.config)))
       return
@@ -117,12 +158,63 @@ export class GatewayServer {
     if (!upstream.body) { res.end(); return }
 
     const reader = upstream.body.getReader()
+    const providerId = resolved.id
+    const apiKey = upstream.usedKey
+    const profile = resolved.profile
+
+    // For streaming responses, try to extract usage from SSE chunks
+    const contentType = upstream.headers.get('content-type') ?? ''
+    const isStreaming = contentType.includes('text/event-stream')
+
+    let streamBuffer = ''
+
     while (true) {
       const chunk = await reader.read()
       if (chunk.done) break
-      res.write(Buffer.from(chunk.value))
+
+      const data = Buffer.from(chunk.value)
+      res.write(data)
+
+      if (isStreaming) {
+        streamBuffer += data.toString('utf8')
+      }
     }
     res.end()
+
+    // After stream ends, try to parse usage from SSE chunks
+    if (isStreaming && streamBuffer.length > 0) {
+      const usage = this.extractStreamingUsage(streamBuffer)
+      if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+        this.stats.recordStreamingUsage(providerId, apiKey, profile, usage.inputTokens, usage.outputTokens)
+      }
+    }
+  }
+
+  /** Extract token usage from SSE stream data */
+  private extractStreamingUsage(streamText: string): { inputTokens: number; outputTokens: number } {
+    let inputTokens = 0
+    let outputTokens = 0
+
+    // Try to find usage in the last chunk (many providers send usage at the end)
+    const lines = streamText.split('\n')
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') continue
+      try {
+        const parsed = JSON.parse(data)
+        // OpenAI format: usage.prompt_tokens / usage.completion_tokens
+        if (parsed?.usage?.prompt_tokens) inputTokens = parsed.usage.prompt_tokens
+        if (parsed?.usage?.completion_tokens) outputTokens = parsed.usage.completion_tokens
+        // Responses API format: usage.input_tokens / usage.output_tokens
+        if (parsed?.usage?.input_tokens) inputTokens = parsed.usage.input_tokens
+        if (parsed?.usage?.output_tokens) outputTokens = parsed.usage.output_tokens
+      } catch {
+        // Not parseable JSON, skip
+      }
+    }
+
+    return { inputTokens, outputTokens }
   }
 
   // ── schedule ────────────────────────────────────────────────────────────────
@@ -146,10 +238,29 @@ export class GatewayServer {
     return false
   }
 
+  /** Check if spend limit should be reset (day or month boundary crossed) */
+  private shouldResetSpendLimit(providerId: string, apiKey: string): void {
+    const state = this.keyState.get(this.ksKey(providerId, apiKey))
+    if (state?.spendLimitHit) {
+      // Re-check if we're still over the limit after potential day/month reset
+      const profile = this.config.providers[providerId]
+      if (profile && !this.isSpendLimitReached(providerId, apiKey, profile)) {
+        state.spendLimitHit = false
+        this.keyState.set(this.ksKey(providerId, apiKey), state)
+        process.stderr.write(`[spend-limit] ${providerId} ${sanitizeKeyPreview(apiKey)} limite resetado (novo período)\n`)
+      }
+    }
+  }
+
   // ── key ordering ─────────────────────────────────────────────────────────────
   private getKeyOrder(providerId: string, profile: ProviderProfile): string[] {
     const strategy: RotationStrategy = this.config.server?.rotation ?? 'fill-first'
     const now = Date.now()
+
+    // Reset spend limits that may have expired
+    for (const apiKey of profile.apiKeys) {
+      this.shouldResetSpendLimit(providerId, apiKey)
+    }
 
     const available = profile.apiKeys.filter((key) => {
       const state = this.keyState.get(this.ksKey(providerId, key))
@@ -166,23 +277,26 @@ export class GatewayServer {
 
     if (strategy === 'round-robin') {
       const idx = this.rrIndex.get(providerId) ?? 0
-      this.rrIndex.set(providerId, (idx + 1) % pool.length)
-      return [...pool.slice(idx % pool.length), ...pool.slice(0, idx % pool.length)]
+      const safeIdx = pool.length > 0 ? idx % pool.length : 0
+      this.rrIndex.set(providerId, (safeIdx + 1) % pool.length)
+      return [...pool.slice(safeIdx), ...pool.slice(0, safeIdx)]
     }
 
     return pool
   }
 
   // ── forward ──────────────────────────────────────────────────────────────────
-  private async tryForward(providerId: string, endpoint: EndpointType, body: Record<string, unknown>): Promise<Response> {
+  private async tryForward(providerId: string, endpoint: EndpointType, body: Record<string, unknown>): Promise<Response & { usedKey: string }> {
     const profile = this.config.providers[providerId]
     const baseUrl = normalizeBaseUrl(profile.baseUrl ?? '')
     const url = `${baseUrl}/${endpoint}`
     const keys = this.getKeyOrder(providerId, profile)
 
     let lastFailure: UpstreamFailure | undefined
+    let usedKey = ''
 
     for (const apiKey of keys) {
+      usedKey = apiKey
       try {
         const response = await fetch(url, {
           method: 'POST',
@@ -194,30 +308,37 @@ export class GatewayServer {
           body: JSON.stringify(body),
         })
 
-        // NOTE: We intentionally do NOT clone the body to parse usage here.
-        // Cloning and consuming a streaming response before piping it to the client
-        // would buffer the entire stream in memory and break true SSE streaming.
-        // Token usage is tracked only for non-streaming (buffered) responses.
         let inputTokens = 0; let outputTokens = 0
         if (response.ok) {
           const contentType = response.headers.get('content-type') ?? ''
           const isStreaming = contentType.includes('text/event-stream')
           if (!isStreaming) {
+            // Non-streaming: clone and parse usage
             const cloned = response.clone()
             const text = await cloned.text().catch(() => '')
             try {
               const parsed = JSON.parse(text)
-              inputTokens = parsed?.usage?.prompt_tokens ?? 0
-              outputTokens = parsed?.usage?.completion_tokens ?? 0
+              inputTokens = parsed?.usage?.prompt_tokens ?? parsed?.usage?.input_tokens ?? 0
+              outputTokens = parsed?.usage?.completion_tokens ?? parsed?.usage?.output_tokens ?? 0
             } catch { /* não é JSON parseável */ }
           }
+          // For streaming: usage is extracted after the stream ends (in handleRequest)
           this.stats.recordRequest(providerId, apiKey, profile, inputTokens, outputTokens, false)
-          return new Response(response.body, { status: response.status, headers: response.headers })
+          return Object.assign(
+            new Response(response.body, { status: response.status, headers: response.headers }),
+            { usedKey }
+          ) as Response & { usedKey: string }
         }
 
         const failureBody = await response.text().catch(() => '')
         lastFailure = { status: response.status, body: failureBody }
         this.stats.recordRequest(providerId, apiKey, profile, 0, 0, true)
+
+        // 401/403 = key invalid, mark cooldown and try next key (but not a "retryable" status)
+        if (response.status === 401 || response.status === 403) {
+          this.markKeyUnavailable(providerId, apiKey, response.status, failureBody)
+          continue
+        }
 
         if (!RETRYABLE_STATUSES.has(response.status)) {
           throw new Error(`Falha não repetível do upstream: ${response.status}`)
@@ -249,14 +370,24 @@ export class GatewayServer {
 
   private async readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
     const chunks: Buffer[] = []
-    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    let receivedBytes = 0
+
+    for await (const chunk of req) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      receivedBytes += buf.length
+      if (receivedBytes > MAX_BODY_SIZE) {
+        throw new Error('Body excede o limite de 10 MB.')
+      }
+      chunks.push(buf)
+    }
+
     const raw = Buffer.concat(chunks).toString('utf8')
     if (!raw.trim()) return {}
     return JSON.parse(raw) as Record<string, unknown>
   }
 
   private ksKey(providerId: string, apiKey: string): string {
-    return `${providerId}:${apiKey}`
+    return `${providerId}::${apiKey}`
   }
 
   private markKeyUnavailable(providerId: string, apiKey: string, status?: number, body?: string): void {
@@ -285,8 +416,10 @@ export class GatewayServer {
 
   private buildStatsPayload() {
     const providers = Object.entries(this.config.providers).map(([id, profile]) => {
-      const keyStatusMap = new Map<string, { status: any; unavailableUntil?: number }>()
+      const keyStatusMap = new Map<string, { status: KeyStats['status']; unavailableUntil?: number }>()
       for (const key of profile.apiKeys) {
+        // Reset spend limits before building stats
+        this.shouldResetSpendLimit(id, key)
         const state = this.keyState.get(this.ksKey(id, key))
         if (state?.spendLimitHit) keyStatusMap.set(key, { status: 'spend-limit' })
         else if (state && state.unavailableUntil > Date.now()) keyStatusMap.set(key, { status: 'cooldown', unavailableUntil: state.unavailableUntil })

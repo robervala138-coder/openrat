@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# Local configs and secrets
+openrat.config.local.json
+openrat.multi.local.json
+.env
+.env.*
+
+# Logs and OS/editor noise
+*.log
+.DS_Store

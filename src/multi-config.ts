@@ -1,10 +1,12 @@
+import os from 'node:os'
 import path from 'node:path'
 
 import { readJsonFile, writeJsonFile } from './fs.js'
 import type { GatewayConfig, MultiConfig, MultiInstance } from './types.js'
 import { expandHome } from './utils.js'
 
-export const DEFAULT_MULTI_CONFIG_PATH = './openrat.multi.json'
+const OPENRAT_HOME = path.join(os.homedir(), '.openrat')
+export const DEFAULT_MULTI_CONFIG_PATH = path.join(OPENRAT_HOME, 'openrat.multi.json')
 const BASE_PORT = 4419
 
 export async function loadMultiConfig(configPath: string): Promise<MultiConfig> {
@@ -159,6 +161,6 @@ export function buildExampleMultiConfig(): MultiConfig {
   }
 }
 
-export function getDefaultMultiConfigPath(cwd = process.cwd()): string {
-  return path.join(cwd, 'openrat.multi.json')
+export function getDefaultMultiConfigPath(): string {
+  return path.join(OPENRAT_HOME, 'openrat.multi.json')
 }

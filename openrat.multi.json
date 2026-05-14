@@ -123,7 +123,7 @@
     {
       "name": "rat-8",
       "port": 4433,
-      "masterKey": "openrai-local",
+      "masterKey": "openrat-local",
       "rotation": "round-robin",
       "routes": { "default": "openrouter" },
       "providers": {

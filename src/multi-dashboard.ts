@@ -1,5 +1,70 @@
 import http from 'node:http'
+import os from 'node:os'
+import { execFileSync, spawn } from 'node:child_process'
 import type { InstanceStatus } from './types.js'
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function doubleQuoteForDisplay(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+function commandExists(command: string): boolean {
+  try {
+    execFileSync('sh', ['-lc', `command -v ${shellQuote(command)}`], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function terminalCommand(): { command: string; argsPrefix: string[] } | null {
+  const candidates = [
+    { command: 'x-terminal-emulator', argsPrefix: ['-e'] },
+    { command: 'gnome-terminal', argsPrefix: ['--'] },
+    { command: 'konsole', argsPrefix: ['-e'] },
+    { command: 'xfce4-terminal', argsPrefix: ['-e'] },
+    { command: 'mate-terminal', argsPrefix: ['-e'] },
+    { command: 'tilix', argsPrefix: ['-e'] },
+    { command: 'alacritty', argsPrefix: ['-e'] },
+    { command: 'kitty', argsPrefix: ['-e'] },
+    { command: 'xterm', argsPrefix: ['-e'] },
+  ]
+  return candidates.find((candidate) => commandExists(candidate.command)) ?? null
+}
+
+function openConfiguredTerminal(instance: InstanceStatus): void {
+  const terminal = terminalCommand()
+  if (!terminal) throw new Error('Nenhum emulador de terminal encontrado.')
+
+  const apiKey = instance.masterKey ?? 'openrat-local'
+  const baseUrl = `http://127.0.0.1:${instance.port}/v1`
+  const model = instance.defaultModel ?? ''
+  const shell = process.env.SHELL || '/bin/bash'
+  const exports = [
+    ['OPENAI_API_KEY', apiKey],
+    ['OPENAI_BASE_URL', baseUrl],
+    ['OPENAI_MODEL', model],
+  ] as const
+  const displayLines = exports.map(([key, value]) => `export ${key}="${doubleQuoteForDisplay(value)}"`)
+  const exportLines = exports.map(([key, value]) => `export ${key}=${shellQuote(value)}`)
+  const script = [
+    ...exportLines,
+    'clear',
+    ...displayLines.map((line) => `printf '%s\\n' ${shellQuote(line)}`),
+    `printf '\\nAmbiente pronto. Digite a CLI que deseja usar.\\n\\n'`,
+    `exec ${shellQuote(shell)} -i`,
+  ].join('\n')
+
+  const child = spawn(terminal.command, [...terminal.argsPrefix, 'bash', '-lc', script], {
+    cwd: os.homedir(),
+    detached: true,
+    stdio: 'ignore',
+  })
+  child.unref()
+}
 
 function buildMultiDashboardHtml(instances: InstanceStatus[]): string {
   const instancesJson = JSON.stringify(instances)
@@ -10,148 +75,339 @@ function buildMultiDashboardHtml(instances: InstanceStatus[]): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OpenRat Multi — Dashboard Central</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
 
-  :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #16161f;
-    --border: #1e1e2e;
-    --accent: #7c3aed;
-    --accent2: #06b6d4;
-    --green: #10b981;
-    --red: #ef4444;
-    --yellow: #f59e0b;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --rat: #a78bfa;
-  }
+:root {
+  --bg: #0d0f14;
+  --bg2: #131620;
+  --bg3: #181c28;
+  --surface: #1e2436;
+  --surface2: #252c3e;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --accent: #5b8dee;
+  --accent2: #3b6fd6;
+  --accent-glow: rgba(91,141,238,0.15);
+  --green: #3ecf8e;
+  --green-dim: rgba(62,207,142,0.12);
+  --amber: #f0a545;
+  --amber-dim: rgba(240,165,69,0.12);
+  --red: #e05252;
+  --red-dim: rgba(224,82,82,0.12);
+  --text: #e8eaf2;
+  --text2: #8b91a8;
+  --text3: #555d78;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+  --r: 10px;
+  --r2: 6px;
+}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; }
-  body::before {
-    content: ''; position: fixed; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none; z-index: 0;
-  }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
 
-  .wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+/* ── TOPBAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.multi-badge {
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  color: white;
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.live-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text2);
+}
 
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 36px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
-  }
-  .logo { display: flex; align-items: center; gap: 14px; }
-  .logo-icon { font-size: 32px; }
-  .logo h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
-  .logo span { color: var(--muted); font-size: 13px; }
-  .multi-badge {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: white; border-radius: 999px; padding: 4px 14px;
-    font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
-    letter-spacing: 1px; text-transform: uppercase;
-  }
-  .live { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+/* ── MAIN ── */
+.main-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+}
 
-  /* Global summary */
-  .global-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 36px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: border-color .2s; }
-  .card:hover { border-color: var(--accent); }
-  .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
-  .card-value { font-size: 26px; font-weight: 800; letter-spacing: -1px; }
-  .card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+/* ── STAT CARDS ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  transition: border-color 0.15s;
+}
+.stat-card:hover { border-color: var(--border2); }
+.stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.stat-value.green { color: var(--green); }
+.stat-value.amber { color: var(--amber); }
+.stat-value.accent { color: var(--accent); }
+.stat-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
 
-  /* Instance grid */
-  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 16px; font-family: 'JetBrains Mono', monospace; }
-  .instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; margin-bottom: 36px; }
+/* ── SECTION TITLE ── */
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 16px;
+}
 
-  .instance-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
-    transition: border-color .2s, transform .15s;
-  }
-  .instance-card:hover { border-color: #3d3d6b; transform: translateY(-1px); }
-  .instance-card.error { border-color: #7f1d1d; }
+/* ── INSTANCE GRID ── */
+.instances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
 
-  .inst-header {
-    padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface2);
-  }
-  .inst-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-  .inst-status-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .dot-running { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-  .dot-error { background: var(--red); }
-  .inst-port { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent2); }
+.instance-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.instance-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.instance-card.error { border-color: var(--red-dim); }
 
-  .inst-body { padding: 16px 20px; }
-  .inst-links { display: flex; gap: 10px; margin-bottom: 14px; }
-  .inst-link {
-    flex: 1; text-align: center; padding: 6px 10px; border-radius: 8px;
-    font-size: 11px; font-family: 'JetBrains Mono', monospace; text-decoration: none;
-    border: 1px solid var(--border); color: var(--text); transition: all .2s;
-    background: var(--bg);
-  }
-  .inst-link:hover { border-color: var(--accent2); color: var(--accent2); }
-  .inst-link.primary { border-color: var(--accent); color: var(--rat); background: #1a0a3a; }
-  .inst-link.primary:hover { background: #2a1055; }
+.inst-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.inst-name {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inst-status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-running { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+.dot-error { background: var(--red); }
+.inst-port {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
 
-  .inst-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .inst-stat { background: var(--bg); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border); }
-  .inst-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
-  .inst-stat-val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.inst-body { padding: 16px 20px; }
+.inst-links { display: flex; gap: 8px; margin-bottom: 14px; }
+.inst-link {
+  flex: 1;
+  text-align: center;
+  padding: 7px 10px;
+  border-radius: var(--r2);
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  transition: all 0.15s;
+  background: var(--bg);
+  appearance: none;
+  line-height: normal;
+}
+.inst-link:hover { border-color: var(--accent); color: var(--accent); }
+.inst-link.primary { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.inst-link.primary:hover { background: rgba(91,141,238,0.25); }
+.inst-link.terminal { cursor: pointer; }
+.inst-link.terminal.opening { color: var(--amber); border-color: var(--amber); background: var(--amber-dim); }
+.inst-link.terminal.error { color: var(--red); border-color: var(--red); background: var(--red-dim); }
 
-  .inst-providers { margin-top: 12px; }
-  .inst-provider-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
-  .inst-provider-row:last-child { border-bottom: none; }
-  .inst-provider-name { color: var(--muted); }
-  .inst-provider-reqs { color: var(--accent2); }
-  .inst-provider-usd { color: var(--green); }
+.inst-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.inst-stat {
+  background: var(--bg);
+  border-radius: var(--r2);
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.inst-stat-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-bottom: 4px;
+  font-family: var(--mono);
+}
+.inst-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
 
-  .inst-error-msg { padding: 12px 20px; color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.inst-providers { margin-top: 12px; }
+.inst-provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.inst-provider-row:last-child { border-bottom: none; }
+.inst-provider-name { color: var(--text3); }
+.inst-provider-reqs { color: var(--accent); }
+.inst-provider-usd { color: var(--green); }
 
-  /* Keys overview section */
-  .keys-section { margin-top: 36px; }
-  .keys-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-  .key-row {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  }
-  .key-row-left { display: flex; flex-direction: column; gap: 2px; }
-  .key-inst { color: var(--rat); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-  .key-preview { color: var(--text); }
-  .key-status { display: flex; align-items: center; gap: 5px; }
-  .ks-dot { width: 7px; height: 7px; border-radius: 50%; }
-  .ks-active { background: var(--green); }
-  .ks-cooldown { background: var(--yellow); }
-  .ks-spend { background: var(--red); }
-  .ks-off { background: var(--muted); }
-  .key-reqs { color: var(--muted); font-size: 11px; }
+.inst-error-msg {
+  padding: 12px 20px;
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 12px;
+}
 
-  footer { text-align: center; margin-top: 48px; font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; border-top: 1px solid var(--border); padding-top: 20px; }
+/* ── KEYS SECTION ── */
+.keys-section { margin-top: 36px; }
+.keys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.key-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.key-row-left { display: flex; flex-direction: column; gap: 2px; }
+.key-inst { color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+.key-preview { color: var(--text); }
+.key-status { display: flex; align-items: center; gap: 5px; }
+.ks-dot { width: 7px; height: 7px; border-radius: 50%; }
+.ks-active { background: var(--green); }
+.ks-cooldown { background: var(--amber); }
+.ks-spend { background: var(--red); }
+.ks-off { background: var(--text3); }
+.key-reqs { color: var(--text3); font-size: 11px; }
 
-  .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; height: 200px; }
-  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.empty { color: var(--text3); font-family: var(--mono); font-size: 13px; padding: 16px 0; }
 
-  .empty { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 16px 0; }
+footer {
+  text-align: center;
+  margin-top: 48px;
+  font-size: 12px;
+  color: var(--text3);
+  font-family: var(--mono);
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r2);
+  height: 200px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+@media (max-width: 800px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .instances-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="logo">
-      <span class="logo-icon">🐀</span>
-      <div>
-        <h1>OpenRat <span class="multi-badge">MULTI</span></h1>
-        <span>Dashboard Central — todas as instâncias</span>
-      </div>
-    </div>
-    <div class="live"><div class="dot"></div><span id="ts">carregando...</span></div>
-  </header>
 
-  <div class="global-cards" id="global-cards">
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🐀</div>
+    <div>OpenRat <span class="multi-badge">MULTI</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-dot"></div>
+    <span class="live-text" id="ts">carregando...</span>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div class="stat-grid" id="global-cards">
     <div class="skeleton" style="height:80px"></div>
     <div class="skeleton" style="height:80px"></div>
     <div class="skeleton" style="height:80px"></div>
@@ -175,6 +431,7 @@ function buildMultiDashboardHtml(instances: InstanceStatus[]): string {
 <script>
 const INSTANCES = ${instancesJson}
 
+function fmtInt(n) { return n != null ? n.toLocaleString('pt-BR') : '0' }
 function fmtUsd(n) { return n ? '$' + n.toFixed(4) : '$0.00' }
 function timeAgo(ts) {
   if (!ts) return 'nunca'
@@ -184,7 +441,6 @@ function timeAgo(ts) {
   return Math.floor(d/3600) + 'h'
 }
 
-// Cache dos stats de cada instância
 const statsCache = new Map()
 
 async function fetchInstanceStats(inst) {
@@ -197,8 +453,29 @@ async function fetchInstanceStats(inst) {
   } catch { return null }
 }
 
+async function openTerminal(instanceName, button) {
+  const previousText = button.textContent
+  button.classList.remove('error')
+  button.classList.add('opening')
+  button.textContent = '⏳ Abrindo'
+  try {
+    const res = await fetch('/open-terminal?name=' + encodeURIComponent(instanceName), { method: 'POST' })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Falha ao abrir terminal' }))
+      throw new Error(body.error || 'Falha ao abrir terminal')
+    }
+    button.textContent = '✅ Terminal'
+    setTimeout(() => { button.textContent = previousText; button.classList.remove('opening') }, 1800)
+  } catch (error) {
+    button.textContent = '❌ Terminal'
+    button.title = error instanceof Error ? error.message : String(error)
+    button.classList.remove('opening')
+    button.classList.add('error')
+    setTimeout(() => { button.textContent = previousText; button.classList.remove('error') }, 3000)
+  }
+}
+
 async function loadAll() {
-  // Fetch all instances in parallel
   const results = await Promise.all(INSTANCES.map(async (inst) => {
     const stats = await fetchInstanceStats(inst)
     if (stats) statsCache.set(inst.name, stats)
@@ -209,7 +486,6 @@ async function loadAll() {
 }
 
 function render(results) {
-  // Global aggregates
   let totalReqs = 0, totalErrors = 0, totalUsdToday = 0, totalKeys = 0, activeKeys = 0
   for (const { stats } of results) {
     if (!stats) continue
@@ -224,10 +500,10 @@ function render(results) {
 
   const running = results.filter(r => r.inst.status === 'running').length
   document.getElementById('global-cards').innerHTML = \`
-    <div class="card"><div class="card-label">Instâncias ativas</div><div class="card-value" style="color:var(--green)">\${running}</div><div class="card-sub">de \${INSTANCES.length} total</div></div>
-    <div class="card"><div class="card-label">Reqs hoje</div><div class="card-value">\${totalReqs.toLocaleString()}</div><div class="card-sub">\${totalErrors} erros</div></div>
-    <div class="card"><div class="card-label">Gasto hoje</div><div class="card-value" style="color:var(--accent2)">\${fmtUsd(totalUsdToday)}</div></div>
-    <div class="card"><div class="card-label">Chaves</div><div class="card-value" style="color:var(--rat)">\${activeKeys}</div><div class="card-sub">\${totalKeys} total</div></div>
+  <div class="stat-card"><div class="stat-label">Instâncias ativas</div><div class="stat-value green">\${running}</div><div class="stat-sub">de \${INSTANCES.length} total</div></div>
+  <div class="stat-card"><div class="stat-label">Reqs hoje</div><div class="stat-value">\${fmtInt(totalReqs)}</div><div class="stat-sub">\${totalErrors} erros</div></div>
+  <div class="stat-card"><div class="stat-label">Gasto hoje</div><div class="stat-value accent">\${fmtUsd(totalUsdToday)}</div></div>
+  <div class="stat-card"><div class="stat-label">Chaves</div><div class="stat-value green">\${activeKeys}</div><div class="stat-sub">\${totalKeys} total</div></div>
   \`
 
   // Instance cards
@@ -242,7 +518,7 @@ function render(results) {
     const providerRows = providers.map(p =>
       \`<div class="inst-provider-row">
         <span class="inst-provider-name">\${p.id}</span>
-        <span class="inst-provider-reqs">\${p.totalRequests} reqs</span>
+        <span class="inst-provider-reqs">\${fmtInt(p.totalRequests)} reqs</span>
         <span class="inst-provider-usd">\${fmtUsd(p.estimatedUsdToday)}</span>
       </div>\`
     ).join('')
@@ -252,33 +528,34 @@ function render(results) {
       : ''
 
     const bodyHtml = isError ? '' : \`
-      <div class="inst-body">
-        <div class="inst-links">
-          <a class="inst-link primary" href="http://127.0.0.1:\${inst.dashboardPort}" target="_blank">📊 Dashboard</a>
-          <a class="inst-link" href="http://127.0.0.1:\${inst.port}/health" target="_blank">❤️ Health</a>
-          <a class="inst-link" href="http://127.0.0.1:\${inst.port}/v1/models" target="_blank">🤖 Models</a>
-        </div>
-        <div class="inst-stats">
-          <div class="inst-stat"><div class="inst-stat-label">Reqs hoje</div><div class="inst-stat-val">\${instReqs.toLocaleString()}</div></div>
-          <div class="inst-stat"><div class="inst-stat-label">Gasto hoje</div><div class="inst-stat-val" style="color:var(--accent2)">\${fmtUsd(instUsd)}</div></div>
-          <div class="inst-stat"><div class="inst-stat-label">Chaves ativas</div><div class="inst-stat-val" style="color:var(--green)">\${instKeys}</div></div>
-          <div class="inst-stat"><div class="inst-stat-label">Status</div><div class="inst-stat-val" style="font-size:13px">\${stats ? '✅ online' : '⏳ aguardando'}</div></div>
-        </div>
-        \${providers.length > 0 ? \`<div class="inst-providers">\${providerRows}</div>\` : ''}
+    <div class="inst-body">
+      <div class="inst-links">
+        <a class="inst-link primary" href="http://127.0.0.1:\${inst.dashboardPort}" target="_blank">📊 Dashboard</a>
+        <a class="inst-link" href="http://127.0.0.1:\${inst.port}/health" target="_blank">❤️ Health</a>
+        <a class="inst-link" href="http://127.0.0.1:\${inst.port}/v1/models" target="_blank">🤖 Models</a>
+        <button class="inst-link terminal" type="button" onclick='openTerminal(\${JSON.stringify(inst.name)}, this)'>💻 Terminal</button>
       </div>
+      <div class="inst-stats">
+        <div class="inst-stat"><div class="inst-stat-label">Reqs hoje</div><div class="inst-stat-val">\${fmtInt(instReqs)}</div></div>
+        <div class="inst-stat"><div class="inst-stat-label">Gasto hoje</div><div class="inst-stat-val" style="color:var(--accent)">\${fmtUsd(instUsd)}</div></div>
+        <div class="inst-stat"><div class="inst-stat-label">Chaves ativas</div><div class="inst-stat-val" style="color:var(--green)">\${instKeys}</div></div>
+        <div class="inst-stat"><div class="inst-stat-label">Status</div><div class="inst-stat-val" style="font-size:13px">\${stats ? '✅ online' : '⏳ aguardando'}</div></div>
+      </div>
+      \${providers.length > 0 ? \`<div class="inst-providers">\${providerRows}</div>\` : ''}
+    </div>
     \`
 
     return \`
-      <div class="instance-card \${isError ? 'error' : ''}">
-        <div class="inst-header">
-          <div class="inst-name">
-            <span class="inst-status-dot \${dotClass}"></span>
-            \${inst.name}
-          </div>
-          <span class="inst-port">:\${inst.port}</span>
+    <div class="instance-card \${isError ? 'error' : ''}">
+      <div class="inst-header">
+        <div class="inst-name">
+          <span class="inst-status-dot \${dotClass}"></span>
+          \${inst.name}
         </div>
-        \${bodyHtml}\${errorHtml}
+        <span class="inst-port">:\${inst.port}</span>
       </div>
+      \${bodyHtml}\${errorHtml}
+    </div>
     \`
   }).join('')
 
@@ -297,19 +574,19 @@ function render(results) {
   document.getElementById('keys-grid').innerHTML = allKeys.length === 0
     ? '<p class="empty">Nenhuma chave carregada ainda...</p>'
     : allKeys.map(({ instName, key }) => \`
-      <div class="key-row">
-        <div class="key-row-left">
-          <span class="key-inst">\${instName}</span>
-          <span class="key-preview">\${key.keyPreview}</span>
-        </div>
-        <div style="text-align:right">
-          <div class="key-status">
-            <span class="ks-dot \${statusMap[key.status] || 'ks-off'}"></span>
-            <span style="font-size:11px;color:var(--muted)">\${key.status}</span>
-          </div>
-          <div class="key-reqs">\${key.requests} reqs · \${fmtUsd(key.estimatedUsdToday)}</div>
-        </div>
+    <div class="key-row">
+      <div class="key-row-left">
+        <span class="key-inst">\${instName}</span>
+        <span class="key-preview">\${key.keyPreview}</span>
       </div>
+      <div style="text-align:right">
+        <div class="key-status">
+          <span class="ks-dot \${statusMap[key.status] || 'ks-off'}"></span>
+          <span style="font-size:11px;color:var(--text3)">\${key.status}</span>
+        </div>
+        <div class="key-reqs">\${fmtInt(key.requests)} reqs · \${fmtUsd(key.estimatedUsdToday)}</div>
+      </div>
+    </div>
     \`).join('')
 }
 
@@ -321,6 +598,8 @@ setInterval(loadAll, 5000)
 }
 
 export class MultiDashboardServer {
+  private server: http.Server | null = null
+
   constructor(
     private readonly instances: InstanceStatus[],
     private readonly port: number,
@@ -328,11 +607,41 @@ export class MultiDashboardServer {
 
   async listen(): Promise<void> {
     const html = buildMultiDashboardHtml(this.instances)
-    const server = http.createServer((_req, res) => {
+    this.server = http.createServer((req, res) => {
+      const url = new URL(req.url ?? '/', `http://127.0.0.1:${this.port}`)
+      if (req.method === 'POST' && url.pathname === '/open-terminal') {
+        const name = url.searchParams.get('name') ?? ''
+        const instance = this.instances.find((inst) => inst.name === name)
+        if (!instance) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ error: 'Instância não encontrada.' }))
+          return
+        }
+        if (instance.status !== 'running') {
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ error: 'A instância não está rodando.' }))
+          return
+        }
+        try {
+          openConfiguredTerminal(instance)
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ ok: true }))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ error: message }))
+        }
+        return
+      }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       res.end(html)
     })
-    await new Promise<void>((resolve) => { server.listen(this.port, '127.0.0.1', resolve) })
+    await new Promise<void>((resolve) => { this.server!.listen(this.port, '127.0.0.1', resolve) })
     process.stdout.write(`\n🐀 Dashboard Central: http://127.0.0.1:${this.port}\n`)
+  }
+
+  async close(): Promise<void> {
+    if (!this.server) return
+    return new Promise((resolve) => { this.server!.close(() => resolve()) })
   }
 }
