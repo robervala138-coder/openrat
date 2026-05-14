@@ -33,7 +33,7 @@
     "langchain"
   ],
   "author": "robervala138-coder <https://github.com/robervala138-coder>",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "homepage": "https://github.com/robervala138-coder/openrat#readme",
   "repository": {
     "type": "git",
