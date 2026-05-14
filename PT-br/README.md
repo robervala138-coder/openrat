@@ -630,7 +630,7 @@ Veja [CONTRIBUTING.md](CONTRIBUTING.md) para configuração, estilo de código e
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE).
+AGPL-3.0 — open source protegido. Modificações e uso como serviço devem manter o código aberto.
 
 ---
 
