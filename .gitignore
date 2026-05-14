@@ -11,3 +11,4 @@ openrat.multi.json
 # Logs and OS/editor noise
 *.log
 .DS_Store
+dist/
