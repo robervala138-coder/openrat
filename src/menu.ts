@@ -293,7 +293,10 @@ let managerServer: http.Server | null = null
 async function serveManager(port = 4399): Promise<void> {
   const htmlPath = findManagerHtml()
 
-  managerServer = http.createServer(async (req, res) => {
+  const managerStateFile = path.join(os.homedir(), '.openrat', 'manager-state.json')
+ const managerVaultFile = path.join(os.homedir(), '.openrat', 'manager-vault.json')
+
+ managerServer = http.createServer(async (req, res) => {
     // ── CORS for local manager — allow any localhost origin ──────────
     const origin = req.headers.origin
     if (origin) {
@@ -430,8 +433,60 @@ async function serveManager(port = 4399): Promise<void> {
       return
     }
 
-    res.writeHead(404)
-    res.end('Not found')
+  // ── Persistent state files ──
+
+  if (req.url === '/openrat/state' && req.method === 'GET') {
+  try {
+  const data = fs.readFileSync(managerStateFile, 'utf8')
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(data)
+  } catch {
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end('null')
+  }
+  return
+  }
+  if (req.url === '/openrat/state' && req.method === 'POST') {
+  try {
+  const body = await readJsonBody(req)
+  fs.writeFileSync(managerStateFile, JSON.stringify(body), 'utf8')
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ ok: true }))
+  } catch (err) {
+  const msg = err instanceof Error ? err.message : String(err)
+  res.writeHead(500, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ ok: false, error: msg }))
+  }
+  return
+  }
+
+  if (req.url === '/openrat/vault' && req.method === 'GET') {
+  try {
+  const data = fs.readFileSync(managerVaultFile, 'utf8')
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(data)
+  } catch {
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end('[]')
+  }
+  return
+  }
+  if (req.url === '/openrat/vault' && req.method === 'POST') {
+  try {
+  const body = await readJsonBody(req)
+  fs.writeFileSync(managerVaultFile, JSON.stringify(body), 'utf8')
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ ok: true }))
+  } catch (err) {
+  const msg = err instanceof Error ? err.message : String(err)
+  res.writeHead(500, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ ok: false, error: msg }))
+  }
+  return
+  }
+
+  res.writeHead(404)
+  res.end('Not found')
   })
 
   await new Promise<void>((resolve) => managerServer!.listen(port, '127.0.0.1', resolve))

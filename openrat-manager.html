@@ -932,68 +932,104 @@
 
 <!-- ADD/EDIT MODAL -->
 <div class="modal-overlay" id="add-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modal-title">Nova Instância</div>
-      <button class="modal-close" onclick="closeModal('add-modal')">✕</button>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Nome</label>
-        <input class="form-input" id="f-name" placeholder="rat-1">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Porta</label>
-        <input class="form-input" id="f-port" type="number" placeholder="4419">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Master Key</label>
-        <input class="form-input" id="f-masterkey" placeholder="rat">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Rotação</label>
-        <select class="form-select" id="f-rotation">
-          <option value="round-robin">round-robin</option>
-          <option value="fill-first">fill-first</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Provider ID</label>
-        <input class="form-input" id="f-provider" placeholder="openrouter">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tipo</label>
-        <select class="form-select" id="f-type">
-          <option value="openai-compatible">openai-compatible</option>
-          <option value="google-ai-studio">google-ai-studio</option>
-          <option value="xai">xai</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-      <label class="form-label">Base URL</label>
-      <input class="form-input" id="f-baseurl" placeholder="https://openrouter.ai/api/v1">
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-      <label class="form-label">Model</label>
-      <input class="form-input" id="f-model" placeholder="tencent/hy3-preview:free">
-    </div>
-    <div class="form-group">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <label class="form-label" style="margin-bottom:0">Chaves de API</label>
-        <button class="btn" style="padding:3px 10px;font-size:11px;" onclick="addKeyField()">+ Chave</button>
-      </div>
-      <div id="key-fields"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('add-modal')">Cancelar</button>
-      <button class="btn primary" onclick="saveInstance()">Salvar</button>
-    </div>
-  </div>
+ <div class="modal" style="max-width:620px;">
+ <div class="modal-header">
+ <div class="modal-title" id="modal-title">Nova Instância</div>
+ <button class="modal-close" onclick="closeModal('add-modal')">✕</button>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label class="form-label">Nome</label>
+ <input class="form-input" id="f-name" placeholder="rat-1">
+ </div>
+ <div class="form-group">
+ <label class="form-label">Porta</label>
+ <input class="form-input" id="f-port" type="number" placeholder="4419">
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label class="form-label">Master Key</label>
+ <input class="form-input" id="f-masterkey" placeholder="rat">
+ </div>
+ <div class="form-group">
+ <label class="form-label">Rotação</label>
+ <select class="form-select" id="f-rotation">
+ <option value="round-robin">round-robin</option>
+ <option value="fill-first">fill-first</option>
+ </select>
+ </div>
+ </div>
+
+ <div class="custom-divider">Provider</div>
+
+ <div class="preset-row">
+ <div class="form-group">
+ <label class="form-label">Preset de Provider</label>
+ <select class="form-select" id="f-preset" onchange="applyPreset()">
+ <option value="qwen">🟠 Alibaba (Qwen) — modelos Qwen via DashScope</option>
+ <option value="custom">⚙ Customizado — preencher manualmente</option>
+ <option value="openrouter">🌐 OpenRouter — modelos free de dezenas de providers</option>
+ <option value="groq">⚡ Groq — inferencia ultra-rapida (LPU)</option>
+ <option value="google-ai-studio">🧠 Google AI Studio — Gemini (free)</option>
+ <option value="huggingface">🤗 HuggingFace — inference server open-source</option>
+ <option value="cloudflare">☁️ Cloudflare Workers AI — edge inference</option>
+ <option value="nvidia">🟢 NVIDIA NIM — GPU otimizada</option>
+ <option value="xai">𝕏 xAI (Grok) — modelos Grok</option>
+ <option value="deepseek">🔵 DeepSeek — codigo + raciocinio (baixo custo)</option>
+ <option value="9router">🔀 9Router — roteador local (Claude, Qwen, etc.)</option>
+ <option value="omniroute">🔀 OmniRoute — roteador local multi-provider</option>
+ </select>
+ </div>
+ </div>
+
+ <div class="preset-info" id="preset-info" style="display:none;">
+ <span class="preset-hint" id="preset-hint"></span>
+ <a id="preset-api-link" href="#" target="_blank" style="display:none;">🔑 Criar Chave de API</a>
+ <a id="preset-github-link" href="#" target="_blank" style="display:none;">📦 GitHub</a>
+ </div>
+
+ <div class="form-row">
+ <div class="form-group">
+ <label class="form-label">Provider ID</label>
+ <input class="form-input" id="f-provider" placeholder="openrouter">
+ </div>
+ <div class="form-group">
+ <label class="form-label">Tipo</label>
+ <select class="form-select" id="f-type">
+ <option value="openai-compatible">openai-compatible</option>
+ <option value="google-ai-studio">google-ai-studio</option>
+ <option value="xai">xai</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-group" style="margin-bottom:12px;">
+ <label class="form-label">Base URL</label>
+ <input class="form-input" id="f-baseurl" placeholder="https://openrouter.ai/api/v1">
+ </div>
+
+ <div class="model-select-row">
+ <div class="form-group">
+ <label class="form-label">Modelo</label>
+ <select class="form-select" id="f-model-select" onchange="applyModelSelect()" style="display:none;"></select>
+ <input class="form-input" id="f-model" placeholder="tencent/hy3-preview:free">
+ </div>
+ </div>
+
+ <div class="custom-divider">Chaves de API</div>
+
+ <div class="form-group">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+ <label class="form-label" style="margin-bottom:0">Chaves</label>
+ <button class="btn" style="padding:3px 10px;font-size:11px;" onclick="addKeyField()">+ Chave</button>
+ </div>
+ <div id="key-fields"></div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn" onclick="closeModal('add-modal')">Cancelar</button>
+ <button class="btn primary" onclick="saveInstance()">Salvar</button>
+ </div>
+ </div>
 </div>
 
 <!-- IMPORT MODAL -->
@@ -1107,18 +1143,41 @@ let dragOffsetY = 0;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
+ // Load from server (persistent file in ~/.openrat/) — works across all browser tabs/profiles
+ initFromServer();
+}
+
+async function initFromServer() {
+ try {
+ const stateRes = await fetch('/openrat/state');
+ const stateData = await stateRes.json();
+ if (stateData && stateData.instances) {
+  state = stateData;
+ } else {
   const saved = localStorage.getItem('openrat-state');
-  if (saved) {
-    try { state = JSON.parse(saved); } catch(e) {}
-  } else {
-    loadDefaultState();
-  }
+  if (saved) { try { state = JSON.parse(saved); } catch(e) {} }
+  else { loadDefaultState(); }
+ }
+ } catch(e) {
+ const saved = localStorage.getItem('openrat-state');
+ if (saved) { try { state = JSON.parse(saved); } catch(e) {} }
+ else { loadDefaultState(); }
+ }
+ try {
+ const vaultRes = await fetch('/openrat/vault');
+ const vaultData = await vaultRes.json();
+ if (Array.isArray(vaultData)) {
+  keyVault = vaultData;
+ } else {
   const savedVault = localStorage.getItem('openrat-keyvault');
-  if (savedVault) {
-    try { keyVault = JSON.parse(savedVault); } catch(e) { keyVault = []; }
-  }
-  render();
-  checkExecStatus(); // Check if gateway is already running
+  if (savedVault) { try { keyVault = JSON.parse(savedVault); } catch(e) { keyVault = []; } }
+ }
+ } catch(e) {
+ const savedVault = localStorage.getItem('openrat-keyvault');
+ if (savedVault) { try { keyVault = JSON.parse(savedVault); } catch(e) { keyVault = []; } }
+ }
+ render();
+ checkExecStatus();
 }
 
 function loadDefaultState() {
@@ -1146,11 +1205,25 @@ function loadDefaultState() {
 }
 
 function saveState() {
-  localStorage.setItem('openrat-state', JSON.stringify(state));
+ // Save to server (persistent across all browser tabs/profiles)
+ fetch('/openrat/state', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(state),
+ }).catch(() => {});
+ // Also save to localStorage as fallback
+ localStorage.setItem('openrat-state', JSON.stringify(state));
 }
 
 function saveVault() {
-  localStorage.setItem('openrat-keyvault', JSON.stringify(keyVault));
+ // Save to server (persistent across all browser tabs/profiles)
+ fetch('/openrat/vault', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(keyVault),
+ }).catch(() => {});
+ // Also save to localStorage as fallback
+ localStorage.setItem('openrat-keyvault', JSON.stringify(keyVault));
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
@@ -1616,41 +1689,437 @@ function copyKey(key) {
 
 
 // ─── ADD/EDIT MODAL ───────────────────────────────────────────────────────────
+// ─── PROVIDER PRESETS ──────────────────────────────────────────────────────
+const PROVIDER_PRESETS = {
+ qwen: {
+  name: 'ALIBABA',
+  type: 'openai-compatible',
+  baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+  providerId: 'Qwen',
+  apiSite: 'https://home.qwencloud.com/api-keys',
+  hint: 'Formato da chave: sk_...',
+  keyPlaceholder: 'sk_...',
+  models: [
+   'qwen3.6-plus',
+   'happyhorse-1.0-t2v',
+   'qwen3.6-flash',
+  ]
+ },
+ openrouter: {
+  name: 'OpenRouter',
+  type: 'openai-compatible',
+  baseUrl: 'https://openrouter.ai/api/v1',
+  providerId: 'openrouter',
+  apiSite: 'https://openrouter.ai/settings/keys',
+  github: 'https://github.com/openrouter-team/openrouter-runner',
+  hint: 'Formato da chave: sk-or-v1-...',
+  keyPlaceholder: 'sk-or-v1-...',
+  models: [
+   'arcee-ai/trinity-large-thinking:free',
+   'baidu/cobuddy:free',
+   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+   'deepseek/deepseek-v4-flash:free',
+   'google/gemma-4-26b-a4b-it:free',
+   'google/gemma-4-31b-it:free',
+   'liquid/lfm-2.5-1.2b-instruct:free',
+   'liquid/lfm-2.5-1.2b-thinking:free',
+   'meta-llama/llama-3.2-3b-instruct:free',
+   'meta-llama/llama-3.3-70b-instruct:free',
+   'minimax/minimax-m2.5:free',
+   'nousresearch/hermes-3-llama-3.1-405b:free',
+   'nvidia/llama-nemotron-embed-vl-1b-v2:free',
+   'nvidia/nemotron-3-nano-30b-a3b:free',
+   'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+   'nvidia/nemotron-3-super-120b-a12b:free',
+   'nvidia/nemotron-nano-12b-v2-vl:free',
+   'nvidia/nemotron-nano-9b-v2:free',
+   'openai/gpt-oss-120b:free',
+   'openai/gpt-oss-20b:free',
+   'openrouter/free',
+   'poolside/laguna-m.1:free',
+   'poolside/laguna-xs.2:free',
+   'qwen/qwen3-coder:free',
+   'qwen/qwen3-next-80b-a3b-instruct:free',
+   'z-ai/glm-4.5-air:free',
+
+  ]
+ },
+ groq: {
+  name: 'Groq',
+  type: 'openai-compatible',
+  baseUrl: 'https://api.groq.com/openai/v1',
+  providerId: 'groq',
+  apiSite: 'https://console.groq.com/keys',
+  github: 'https://github.com/groq/groq-sdk',
+  hint: 'Formato da chave: gsk_...',
+  keyPlaceholder: 'gsk_...',
+  models: [
+   'llama-3.3-70b-versatile',
+   'llama-3.1-8b-instant',
+   'deepseek-r1-distill-llama-70b',
+   'mixtral-8x7b-32768',
+   'gemma2-9b-it',
+   'qwen-qwq-32b',
+  ]
+ },
+ 'google-ai-studio': {
+  name: 'Google AI Studio',
+  type: 'google-ai-studio',
+  baseUrl: '',
+  providerId: 'gemini-flash',
+  apiSite: 'https://aistudio.google.com/apikey',
+  github: '',
+  hint: 'Formato da chave: AIza... — URL configurada automaticamente',
+  keyPlaceholder: 'AIza...',
+  models: [
+   'gemini-2.5-pro',
+   'gemini-2.5-flash',
+   'gemini-2.0-flash',
+   'gemini-1.5-pro',
+   'gemini-1.5-flash',
+  ]
+ },
+ huggingface: {
+  name: 'HuggingFace',
+  type: 'openai-compatible',
+  baseUrl: 'https://router.huggingface.co/v1',
+  providerId: 'huggingface',
+  apiSite: 'https://huggingface.co/settings/tokens',
+  github: 'https://github.com/huggingface/huggingface-inference-server',
+  hint: 'Formato da chave: hf_... — token tipo "Read"',
+  keyPlaceholder: 'hf_...',
+  models: [
+   'meta-llama/Llama-3.3-70B-Instruct',
+   'deepseek-ai/DeepSeek-R1',
+   'Qwen/Qwen2.5-Coder-32B-Instruct',
+   'mistralai/Mistral-7B-Instruct-v0.3',
+   'google/gemma-2-9b-it',
+   'microsoft/Phi-3-mini-4k-instruct',
+  ]
+ },
+ cloudflare: {
+  name: 'Cloudflare Workers AI',
+  type: 'openai-compatible',
+  baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/v1',
+  providerId: 'cloudflare',
+  apiSite: 'https://dash.cloudflare.com/profile/api-tokens',
+  github: 'https://github.com/cloudflare/workers-ai',
+  hint: 'Substitua {ACCOUNT_ID} pelo seu Account ID da Cloudflare',
+  keyPlaceholder: 'Seu token Cloudflare...',
+  models: [
+  'cf/@cf/meta/llama-3.2-3b-instruct',
+  'cf/@cf/meta/llama-3.2-1b-instruct',
+  'cf/@cf/meta/llama-3.1-8b-instruct-fp8-fast',
+  'cf/@cf/meta/llama-3.1-8b-instruct-awq',
+  'cf/@cf/mistralai/mistral-small-3.1-24b-instruct',
+  'cf/@cf/meta/llama-3.1-70b-instruct-fp8-fast',
+  'cf/@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  'cf/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+  'cf/@cf/moonshotai/kimi-k2.5',
+  'cf/@cf/moonshotai/kimi-k2.6',
+  'cf/@cf/zai-org/glm-4.7-flash',
+  'cf/@cf/qwen/qwq-32b',
+  'cf/@cf/qwen/qwen2.5-coder-32b-instruct',
+  ]
+ },
+ nvidia: {
+  name: 'NVIDIA NIM',
+  type: 'openai-compatible',
+  baseUrl: 'https://integrate.api.nvidia.com/v1',
+  providerId: 'nvidia',
+  apiSite: 'https://build.nvidia.com',
+  github: 'https://github.com/NVIDIA/nim',
+  hint: 'Formato da chave: nvapi-... — free trial com creditos',
+  keyPlaceholder: 'nvapi-...',
+  models: [
+  'moonshotai/kimi-k2.6',
+  'deepseek-ai/deepseek-v4-flash',
+  'mistralai/mistral-medium-3.5-128b',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+  'deepseek-ai/deepseek-v4-pro',
+  'z-ai/glm-5.1',
+  'nvidia/nemotron-3-content-safety',
+  'minimaxai/minimax-m2.7',
+  'google/gemma-4-31b-it',
+  'mistralai/mistral-small-4-119b-2603',
+  'qwen/qwen3-coder-480b-a35b-instruct',
+  ]
+ },
+ xai: {
+  name: 'xAI (Grok)',
+  type: 'xai',
+  baseUrl: '',
+  providerId: 'grok',
+  apiSite: 'https://console.x.ai',
+  github: '',
+  hint: 'Formato da chave: xai-... — URL configurada automaticamente',
+  keyPlaceholder: 'xai-...',
+  models: [
+   'grok-3-mini',
+   'grok-3',
+   'grok-2',
+   'grok-2-mini',
+  ]
+ },
+ deepseek: {
+  name: 'DeepSeek',
+  type: 'openai-compatible',
+  baseUrl: 'https://api.deepseek.com/v1',
+  providerId: 'deepseek',
+  apiSite: 'https://platform.deepseek.com/api_keys',
+  github: 'https://github.com/deepseek-ai',
+  hint: 'Formato da chave: sk-... — precos muito baixos',
+  keyPlaceholder: 'sk-...',
+  models: [
+   'deepseek-chat',
+   'deepseek-reasoner',
+  ]
+ },
+ '9router': {
+  name: '9Router',
+  type: 'openai-compatible',
+  baseUrl: 'http://localhost:20128/v1',
+  providerId: '9router',
+  apiSite: 'https://9router.com',
+  github: '',
+  hint: 'Roteador local — requer execucao local em localhost:20128',
+  keyPlaceholder: 'Sua chave 9Router...',
+  models: [
+   'bpm/glm-4-7-251222',
+   'bpm/kimi-k2-thinking-251104',
+   'bpm/gpt-oss-120b-250805',
+   'bpm/seed-2-0-code-preview-260328',
+   'bpm/seed-2-0-lite-260228',
+   'bpm/seed-2-0-mini-260215',
+   'bpm/seed-2-0-pro-260328',
+   'cf/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+   'cf/@cf/meta/llama-3.1-70b-instruct-fp8-fast',
+   'cf/@cf/meta/llama-3.1-8b-instruct-awq',
+   'cf/@cf/meta/llama-3.1-8b-instruct-fp8-fast',
+   'cf/@cf/meta/llama-3.2-1b-instruct',
+   'cf/@cf/meta/llama-3.2-3b-instruct',
+   'cf/@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+   'cf/@cf/mistralai/mistral-small-3.1-24b-instruct',
+   'cf/@cf/moonshotai/kimi-k2.5',
+   'cf/@cf/moonshotai/kimi-k2.6',
+   'cf/@cf/qwen/qwen2.5-coder-32b-instruct',
+   'cf/@cf/qwen/qwq-32b',
+   'cf/@cf/zai-org/glm-4.7-flash',
+   'gemini/gemini-2.0-flash',
+   'gemini/gemini-2.0-flash-lite',
+   'gemini/gemini-2.5-flash',
+   'gemini/gemini-2.5-flash-lite',
+   'gemini/gemini-2.5-pro',
+   'gemini/gemini-3.1-flash-lite-preview',
+   'gemini/gemini-3.1-pro-preview',
+   'gemini/gemini-3-flash-preview',
+   'gemini/gemma-4-31b-it',
+   'kr/claude-haiku-4.5',
+   'kr/claude-haiku-4.5-agentic',
+   'kr/claude-haiku-4.5-thinking',
+   'kr/claude-haiku-4.5-thinking-agentic',
+   'kr/claude-sonnet-4.5',
+   'kr/claude-sonnet-4.5-agentic',
+   'kr/claude-sonnet-4.5-thinking',
+   'kr/claude-sonnet-4.5-thinking-agentic',
+   'kr/deepseek-3.2',
+   'kr/glm-5',
+   'kr/MiniMax-M2.5',
+   'kr/qwen3-coder-next',
+   'oc/deepseek-v4-flash-free',
+   'oc/minimax-m2.5-free',
+   'oc/nemotron-3-super-free',
+   'oc/qwen3.6-plus-free',
+   'oc/ring-2.6-1t-free',
+   'oc/trinity-large-preview-free',
+   'vx/gemini-2.5-flash',
+   'vx/gemini-3.1-flash-lite-preview',
+   'vx/gemini-3.1-pro-preview',
+   'vx/gemini-3-flash-preview',
+  ]
+ },
+ omniroute: {
+  name: 'OmniRoute',
+  type: 'openai-compatible',
+  baseUrl: 'http://localhost:20128/v1',
+  providerId: 'omniroute',
+  apiSite: 'https://omniroute.online',
+  github: '',
+  hint: 'Roteador local — requer execucao local em localhost:20128',
+  keyPlaceholder: 'Sua chave OmniRoute...',
+  models: [
+   'iflow/deepseek-r1',
+   'iflow/qwen3-coder-plus',
+   'iflow/kimi-k2-thinking',
+   'qwen/qwen3-coder-plus',
+   'kiro/claude-sonnet-4.5',
+   'kiro/glm-5',
+   'gemini/gemini-2.5-pro',
+   'openrouter/auto',
+   'nvidia/nemotron-3-super',
+   'cloudflare/deepseek-r1',
+   'glm/glm-5',
+   'deepseek/deepseek-v3',
+   'meta/llama-3.3-70b',
+   'google/gemma-3-27b',
+  ]
+ }
+};
+
+function applyPreset() {
+ const presetKey = document.getElementById('f-preset').value;
+ const preset = PROVIDER_PRESETS[presetKey];
+ const infoEl = document.getElementById('preset-info');
+ const hintEl = document.getElementById('preset-hint');
+ const apiLink = document.getElementById('preset-api-link');
+ const ghLink = document.getElementById('preset-github-link');
+ const modelSelect = document.getElementById('f-model-select');
+ const modelInput = document.getElementById('f-model');
+
+ if (!preset) {
+  // custom
+  infoEl.style.display = 'none';
+  modelSelect.style.display = 'none';
+  modelInput.style.display = '';
+  modelInput.value = '';
+  return;
+ }
+
+ // Show preset info bar
+ infoEl.style.display = 'flex';
+ hintEl.textContent = preset.hint;
+
+ if (preset.apiSite) {
+  apiLink.href = preset.apiSite;
+  apiLink.textContent = '🔑 Criar Chave em ' + preset.name;
+  apiLink.style.display = '';
+ } else {
+  apiLink.style.display = 'none';
+ }
+
+ if (preset.github) {
+  ghLink.href = preset.github;
+  ghLink.textContent = '📦 GitHub';
+  ghLink.style.display = '';
+ } else {
+  ghLink.style.display = 'none';
+ }
+
+ // Fill fields
+ document.getElementById('f-provider').value = preset.providerId;
+ document.getElementById('f-type').value = preset.type;
+ document.getElementById('f-baseurl').value = preset.baseUrl;
+ document.getElementById('f-baseurl').readOnly = preset.type !== 'openai-compatible' || presetKey === 'cloudflare';
+
+ // Show model dropdown if preset has models
+ if (preset.models && preset.models.length > 0) {
+  modelSelect.style.display = '';
+  modelInput.style.display = 'none';
+  modelSelect.innerHTML = '<option value="">— Selecione um modelo —</option>' +
+   preset.models.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('');
+  modelSelect.value = preset.models[0];
+  modelInput.value = preset.models[0];
+ } else {
+  modelSelect.style.display = 'none';
+  modelInput.style.display = '';
+  modelInput.value = '';
+ }
+
+ // Update key placeholder
+ document.querySelectorAll('.key-input').forEach(el => {
+  el.placeholder = preset.keyPlaceholder || 'sk-...';
+ });
+}
+
+function applyModelSelect() {
+ const modelSelect = document.getElementById('f-model-select');
+ const modelInput = document.getElementById('f-model');
+ if (modelSelect.value) {
+  modelInput.value = modelSelect.value;
+ }
+}
+
 function openAddModal() {
-  editingIdx = -1;
-  document.getElementById('modal-title').textContent = 'Nova Instância';
-  document.getElementById('f-name').value = `rat-${state.instances.length+1}`;
-  document.getElementById('f-port').value = state.basePort + state.instances.length*2;
-  document.getElementById('f-masterkey').value = 'rat';
-  document.getElementById('f-rotation').value = 'round-robin';
-  document.getElementById('f-provider').value = 'openrouter';
-  document.getElementById('f-type').value = 'openai-compatible';
-  document.getElementById('f-baseurl').value = 'https://openrouter.ai/api/v1';
-  document.getElementById('f-model').value = 'tencent/hy3-preview:free';
-  document.getElementById('key-fields').innerHTML = '';
-  addKeyField();
-  openModal('add-modal');
+ editingIdx = -1;
+ document.getElementById('modal-title').textContent = 'Nova Instância';
+ document.getElementById('f-name').value = `rat-${state.instances.length+1}`;
+ document.getElementById('f-port').value = state.basePort + state.instances.length*2;
+ document.getElementById('f-masterkey').value = 'rat';
+ document.getElementById('f-rotation').value = 'round-robin';
+ document.getElementById('f-preset').value = 'openrouter';
+ document.getElementById('f-provider').value = 'openrouter';
+ document.getElementById('f-type').value = 'openai-compatible';
+ document.getElementById('f-baseurl').value = 'https://openrouter.ai/api/v1';
+ document.getElementById('f-baseurl').readOnly = false;
+ document.getElementById('f-model').value = 'deepseek/deepseek-r1:free';
+ document.getElementById('key-fields').innerHTML = '';
+ addKeyField();
+ applyPreset();
+ openModal('add-modal');
 }
 
 function openEditModal(idx) {
-  editingIdx = idx;
-  const inst = state.instances[idx];
-  const provId = Object.keys(inst.providers)[0];
-  const prov = inst.providers[provId];
-  document.getElementById('modal-title').textContent = `Editar: ${inst.name}`;
-  document.getElementById('f-name').value = inst.name;
-  document.getElementById('f-port').value = inst.port || '';
-  document.getElementById('f-masterkey').value = inst.masterKey || 'rat';
-  document.getElementById('f-rotation').value = inst.rotation || 'round-robin';
-  document.getElementById('f-provider').value = provId;
-  document.getElementById('f-type').value = prov.type;
-  document.getElementById('f-baseurl').value = prov.baseUrl || '';
-  document.getElementById('f-model').value = prov.model;
-  const kf = document.getElementById('key-fields');
-  kf.innerHTML = '';
-  (prov.apiKeys || []).forEach((k) => addKeyField(k, ''));
-  // Values already set via addKeyField presetKey parameter
-  openModal('add-modal');
+ editingIdx = idx;
+ const inst = state.instances[idx];
+ const provId = Object.keys(inst.providers)[0];
+ const prov = inst.providers[provId];
+ document.getElementById('modal-title').textContent = `Editar: ${inst.name}`;
+ document.getElementById('f-name').value = inst.name;
+ document.getElementById('f-port').value = inst.port || '';
+ document.getElementById('f-masterkey').value = inst.masterKey || 'rat';
+ document.getElementById('f-rotation').value = inst.rotation || 'round-robin';
+ document.getElementById('f-provider').value = provId;
+ document.getElementById('f-type').value = prov.type;
+ document.getElementById('f-baseurl').value = prov.baseUrl || '';
+ document.getElementById('f-baseurl').readOnly = false;
+ document.getElementById('f-model').value = prov.model;
+
+ // Try to match the provider to a preset
+ const baseUrl = (prov.baseUrl || '').replace(/[/]+$/, '');
+ let matchedPreset = 'custom';
+ for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
+  const presetUrl = (preset.baseUrl || '').replace(/[/]+$/, '');
+  if (preset.type === prov.type && preset.type !== 'openai-compatible') {
+   matchedPreset = key;
+   break;
+  }
+  if (preset.type === 'openai-compatible' && presetUrl && baseUrl && presetUrl === baseUrl) {
+   matchedPreset = key;
+   break;
+  }
+  if (key === 'cloudflare' && baseUrl.includes('cloudflare.com')) {
+   matchedPreset = key;
+   break;
+  }
+  if (preset.providerId === provId && preset.type === prov.type) {
+   matchedPreset = key;
+   break;
+  }
+ }
+ document.getElementById('f-preset').value = matchedPreset;
+ applyPreset();
+
+ // After applyPreset, set the actual model value
+ const modelSelect = document.getElementById('f-model-select');
+ if (modelSelect.style.display !== 'none') {
+  const opt = Array.from(modelSelect.options).find(o => o.value === prov.model);
+  if (opt) {
+   modelSelect.value = prov.model;
+  } else {
+   const customOpt = document.createElement('option');
+   customOpt.value = prov.model;
+   customOpt.textContent = prov.model + ' (atual)';
+   modelSelect.appendChild(customOpt);
+   modelSelect.value = prov.model;
+  }
+ }
+ document.getElementById('f-model').value = prov.model;
+
+ const kf = document.getElementById('key-fields');
+ kf.innerHTML = '';
+ (prov.apiKeys || []).forEach((k) => addKeyField(k, ''));
+ // Values already set via addKeyField presetKey parameter
+ openModal('add-modal');
 }
 
 let keyFieldCount = 0;

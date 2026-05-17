@@ -10,7 +10,7 @@
 
 > Pure Node.js. No database. No Docker. No Bun. No external runtime dependencies.
 
-[Features](#features) · [Quick Start](#quick-start) · [Configuration](#configuration) · [CLI Reference](#cli-reference) · [Integrations](#integrations) · [Background Mode](#background-mode) · [Multi-Instance Mode](#multi-instance-mode) · [Contributing](CONTRIBUTING.md)
+[Features](#features) · [Quick Start](#quick-start) · [Configuration](#configuration) · [CLI Reference](#cli-reference) · [Integrations](#integrations) · [Background Mode](#background-mode) · [Multi-Instance Mode](#multi-instance-mode) · [Providers Guide](PROVIDERS.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -98,6 +98,8 @@ Use the arrow keys to choose between the visual browser manager or CLI commands.
 ---
 
 ## Configuration
+
+> **Looking for API keys?** See [**PROVIDERS.md**](PROVIDERS.md) — complete guide with: where to create API keys, all free models per provider, GitHub links, and ready-to-use config examples for OpenRouter, Groq, Google AI Studio, HuggingFace, Cloudflare, NVIDIA NIM, xAI, DeepSeek, 9Router, and OmniRoute.
 
 ### 1. Generate an example config
 
