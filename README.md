@@ -1,4 +1,5 @@
 <div align="center">
+![OpenRAT Banner](assets/banner.png)
 
 #  OpenRat
 
