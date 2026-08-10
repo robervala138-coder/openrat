@@ -1,5 +1,5 @@
 <div align="center">
-![OpenRAT Banner](assets/banner.png)
+<img src="https://raw.githubusercontent.com/NucleoVazio/openrat/main/assets/banner.png" alt="OpenRAT Banner" width="800"/>
 
 #  OpenRat
 
