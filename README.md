@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐀 OpenRat
+#  OpenRat
 
 **Local OpenAI-compatible gateway — route requests across multiple AI providers with smart key rotation, spend limits, scheduling, and a visual dashboard.**
 
@@ -111,7 +111,7 @@ This creates `~/.openrat/openrat.config.json` by default. Edit it and replace th
 
 To create the config in another location, pass `--config PATH`.
 
-> 💡 **Tip:** For your real keys, use `openrat.config.local.json` — it's already in `.gitignore`.
+>  **Tip:** For your real keys, use `openrat.config.local.json` — it's already in `.gitignore`.
 
 ### 2. Config file reference
 
